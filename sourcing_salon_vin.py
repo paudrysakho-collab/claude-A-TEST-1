@@ -32,6 +32,7 @@ DOSSIER_SOURCES = os.path.join(ICI, "donnees_sources")
 DOSSIER_CACHE = os.path.join(ICI, "cache")
 SORTIE = os.path.join(ICI, "NOUVEAUX_CONTACTS_CLAUDE_CODE.csv")
 SORTIE_DETAILS = os.path.join(ICI, "NOUVEAUX_CONTACTS_DETAILS.csv")
+EXCLURE_EN_PLUS = []  # autres fichiers Email,Prenom déjà livrés (option --exclure)
 CANDIDATS = os.path.join(ICI, "candidats_sites.csv")
 
 USER_AGENT = "Mozilla/5.0 (compatible; SalonVinRairie-sourcing/1.0)"
@@ -292,6 +293,17 @@ def charger_liste_noire(verbeux=True):
         "Inscrits": {normaliser_email(_col(r, c)) for r in inscr
                      for c in ("Adresse e-mail à laquelle vous souhaitez communiquer", "Adresse e-mail")},
     }
+    for chemin in EXCLURE_EN_PLUS:
+        lignes = list(csv.DictReader(open(chemin, encoding="utf-8-sig")))
+        par_source[os.path.basename(chemin)[:9]] = {normaliser_email(r.get("Email")) for r in lignes}
+        fusion = fusion + lignes  # leurs formules « à toute l'équipe de X » alimentent aussi les noms connus
+    noms_livres = set()
+    for chemin in EXCLURE_EN_PLUS:
+        details = chemin.replace(".csv", "_DETAILS.csv")
+        if not os.path.exists(details) and chemin.endswith("CLAUDE_CODE.csv"):
+            details = os.path.join(os.path.dirname(chemin), "NOUVEAUX_CONTACTS_DETAILS.csv")
+        if os.path.exists(details):
+            noms_livres |= {cle_nom(r.get("Etablissement")) for r in csv.DictReader(open(details, encoding="utf-8"))}
     emails = set().union(*par_source.values()) - {""}
 
     domaines = {domaine(e) for e in emails} - WEBMAILS - {""}
@@ -304,6 +316,7 @@ def charger_liste_noire(verbeux=True):
         m = RE_FORMULE.match((r.get("Prenom") or "").strip())
         if m:
             noms.add(cle_nom(m.group(1)))
+    noms |= noms_livres
     noms = {n for n in noms if len(n) >= 4}
 
     if verbeux:
@@ -845,15 +858,19 @@ def candidats_recherche(nav, villes, profils, max_requetes=200):
 
 VT_BASE = "https://www.vendee-tourisme.com/restaurants-en-vendee"
 VT_FILTRES = ["/search_api_cluster_4/Maitre%20Restaurateur", "/search_api_cluster_3/Gastronomique",
-              "/search_api_cluster_3/Traditionnel"]
-RE_VT_FICHE = re.compile(r"https://www\.vendee-tourisme\.com/[a-z0-9-]+/[a-z0-9-]+/respdl\w+")
-RE_HORS_PROFIL = re.compile(r"pizz|cr[eê]p|cuisine du monde|sur le pouce|restauration rapide|kebab|burger|"
-                            r"sushi|asiat|snack|food.?truck|glacier|friterie|tacos|chinois|japonais|indien", re.I)
+              "/search_api_cluster_3/Traditionnel", "/search_api_cluster_3/Cuisine%20de%20la%20mer",
+              "https://www.vendee-tourisme.com/hotels-en-vendee"]
+RE_VT_FICHE = re.compile(r"https://www\.vendee-tourisme\.com/[a-z0-9-]+/[a-z0-9-]+/(?:respdl|hotpdl)\w+")
+RE_HORS_PROFIL = re.compile(r"pizz|cr[eê]p|galette|bl[ée] noir|cuisine du monde|sur le pouce|restauration rapide|"
+                            r"kebab|burger|sushi|asiat|snack|food.?truck|glacier|friterie|tacos|chinois|japonais|"
+                            r"indien|vietnam|tha[iï]|wok|royal|misay|nhu|ristorante|trattoria|vesuvio|ibla|"
+                            r"mie c[aâ]line|buffalo|fraiseraie|emportez|kyriad", re.I)
 
 
 # Exclusions validées avec l'utilisateur (chaînes, snacks, cuisines étrangères) — 28/09/2026.
 EXCLUSIONS_VALIDEES = ("les3brasseurs.com", "pankeming@", "frenzi.fr", "redzone-challans.fr",
-                       "snack-a-manu@", "la-boucherie.fr")
+                       "snack-a-manu@", "la-boucherie.fr",
+                       "parthenay@")  # magasin du réseau situé à Parthenay (79), hors des 100 km
 
 
 def candidats_vendee_tourisme(nav, max_pages=40):
@@ -862,7 +879,8 @@ def candidats_vendee_tourisme(nav, max_pages=40):
     for filtre in VT_FILTRES:
         vues = set()
         for p in range(max_pages):
-            html = nav.get(VT_BASE + filtre + (f"?page={p}" if p else "")) or ""
+            base = filtre if filtre.startswith("http") else VT_BASE + filtre
+            html = nav.get(base + (f"?page={p}" if p else "")) or ""
             nouvelles = [f for f in dict.fromkeys(RE_VT_FICHE.findall(html)) if f not in vues]
             if not nouvelles:
                 break
@@ -872,6 +890,54 @@ def candidats_vendee_tourisme(nav, max_pages=40):
                        for f in nouvelles]
     print(f"  Vendée Tourisme : {len(fiches)} fiches restaurants")
     return list({f["url"]: f for f in fiches}.values())
+
+
+OT_LISTES = [  # (page de liste, profil)
+    ("https://www.pornic.com/tous-les-restaurants.html", "restaurant"),
+    ("https://www.pornic.com/boutiques-gourmandes-epiceries-fines.html", "commerce"),
+    ("https://www.pornic.com/traiteur-destination-pornic-traiteurs.html", "traiteur"),
+    ("https://www.pornic.com/commerces-services.html", "commerce"),
+    ("https://www.saint-brevin.com/restaurants.html", "restaurant"),
+    ("https://www.saint-brevin.com/commerces-services.html", "commerce"),
+    ("https://www.saint-brevin.com/bars-discotheques.html", "bar"),
+]
+
+
+def candidats_offices_tourisme(nav, max_pages=40):
+    """Fiches des offices de tourisme dont les pages exposent l'e-mail en données schema.org."""
+    sortie = []
+    for liste, profil in OT_LISTES:
+        racine = liste.rsplit("/", 1)[0] + "/"
+        vues = set()
+        for p in range(1, max_pages + 1):
+            html = nav.get(liste + (f"?page={p}" if p > 1 else "")) or ""
+            fiches = [racine + f for f in dict.fromkeys(re.findall(r'href="([a-z0-9-]+\.html)\?origine_affinage', html))]
+            nouvelles = [f for f in fiches if f not in vues]
+            if not nouvelles:
+                break
+            vues.update(nouvelles)
+            sortie += [{"nom": "", "ville": "", "url": f, "categorie": profil, "fiche": "ot",
+                        "source": "Office de tourisme " + urlparse(liste).netloc} for f in nouvelles]
+    sortie = list({x["url"]: x for x in sortie}.values())
+    print(f"  Offices de tourisme (Pornic, Saint-Brevin) : {len(sortie)} fiches")
+    return sortie
+
+
+def lire_fiche_schema(html):
+    """(nom, email, cp, texte) depuis le bloc schema.org (JSON-LD) d'une fiche d'office de tourisme."""
+    for m in re.finditer(r"<script[^>]*application/ld\+json[^>]*>(.*?)</script>", html, re.S):
+        t = m.group(1)
+        em = re.findall(r'"email"\s*:\s*"([^"]+)"', t)
+        if em:
+            nm = re.findall(r'"name"\s*:\s*"([^"]+)"', t)
+            cp = re.findall(r'"postalCode"\s*:\s*"([^"]+)"', t)
+            try:
+                nom = json.loads('"' + nm[0] + '"') if nm else ""
+            except ValueError:
+                nom = nm[0].replace("\\", "") if nm else ""
+            texte = re.sub(r"<[^>]+>", " ", html)
+            return nom, normaliser_email(em[0].replace("\\/", "/")), (cp[0] if cp else ""), texte
+    return "", "", "", ""
 
 
 def lire_fiche_tourinsoft(html):
@@ -920,6 +986,9 @@ def collecter(maximum, sources):
     if "vendee" in sources:
         print("→ Vendée Tourisme…")
         candidats += candidats_vendee_tourisme(nav)
+    if "ot" in sources:
+        print("→ Offices de tourisme…")
+        candidats += candidats_offices_tourisme(nav)
     if "recherche" in sources:
         print("→ Moteur de recherche…")
         candidats += candidats_recherche(nav, VILLES, PROFILS_RECHERCHE)
@@ -935,6 +1004,8 @@ def collecter(maximum, sources):
         hote_source = urlparse(c["url"]).netloc.replace("www.", "")
         if not r and c.get("fiche") and dom != hote_source and dom.split(".")[0] in hote_source:
             r = "adresse de l'annuaire lui-même"
+        if not r and c.get("fiche") in ("ot", "tourinsoft") and RE_HORS_PROFIL.search(email):
+            r = "hors profil d'après l'adresse (crêperie, pizzeria, chaîne…)"
         if not r and c.get("fiche") and re.search(r"tourisme|mairie|agglo|^ot-|ville-|commune|vignoble", dom):
             r = "adresse d'un office de tourisme ou d'une mairie"
         # Sur une fiche d'annuaire, l'adresse doit être un webmail ou porter le nom de l'établissement
@@ -1023,6 +1094,34 @@ def collecter(maximum, sources):
                     continue
                 retenir(email, nom, ville, cp, dist, cat, c["url"], c)
             continue
+        if c.get("fiche") == "ot":
+            if c["url"] in sites_vus:
+                continue
+            sites_vus.add(c["url"])
+            html = nav.get(c["url"])
+            nom, email, cp, texte = lire_fiche_schema(html or "")
+            if not email:
+                journal.append((c["url"], "", f"{nom} : pas d'e-mail sur la fiche"))
+                continue
+            if c["categorie"] in ("restaurant", "traiteur", "bar"):
+                if RE_HORS_PROFIL.search(nom) or re.search(r"pizzeria|kebab|fast.food|cr[eê]perie|snack|servescuisine\W+(?:asian|italian|chinese|pizza)", texte[:8000].lower()):
+                    journal.append((c["url"], email, f"{nom} : hors profil (pizzeria, crêperie, rapide…)"))
+                    continue
+                cat = {"restaurant": "Restaurant", "traiteur": "Traiteur", "bar": "Bar à vins / tapas"}[c["categorie"]]
+                if c["categorie"] == "bar" and not re.search(r"\bvins?\b|cave|tapas", (nom + texte[:6000]).lower()):
+                    journal.append((c["url"], email, f"{nom} : bar sans vin"))
+                    continue
+            else:
+                cat, raison = qualifier(texte[:8000], nom)
+                if not cat or cat in ("Restaurant", "Hôtel-restaurant"):
+                    journal.append((c["url"], email, f"{nom} : {raison or 'commerce hors profil'}"))
+                    continue
+            ville, dist = distance_par_cp(nav, cp) if cp else (None, None)
+            if dist is None or dist > RAYON_KM:
+                journal.append((c["url"], email, f"{nom} : hors zone ({cp or '?'})"))
+                continue
+            retenir(email, nom, ville, cp, dist, cat, c["url"], c)
+            continue
         if c.get("fiche") == "tourinsoft":
             if c["url"] in sites_vus:
                 continue
@@ -1034,6 +1133,9 @@ def collecter(maximum, sources):
             nom, email, cp, debut, texte = lire_fiche_tourinsoft(html)
             if not email:
                 journal.append((c["url"], "", f"{nom} : pas d'e-mail sur la fiche"))
+                continue
+            if "hotpdl" in c["url"] and not re.search(r"\brestaurant\b", texte.split("Vous aimerez aussi")[0], re.I):
+                journal.append((c["url"], email, f"{nom} : hôtel sans restaurant"))
                 continue
             if RE_HORS_PROFIL.search(nom + " " + debut):
                 journal.append((c["url"], email, f"{nom} : hors profil (pizzeria, crêperie, rapide…)"))
@@ -1176,9 +1278,16 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("etape", choices=["liste-noire", "test-prenoms", "collecter", "verifier"])
     ap.add_argument("--max", type=int, default=100)
+    ap.add_argument("--sortie", help="nom du fichier CSV à produire (défaut : NOUVEAUX_CONTACTS_CLAUDE_CODE.csv)")
+    ap.add_argument("--exclure", nargs="*", default=[], help="fichiers déjà livrés à ajouter à la liste noire")
     ap.add_argument("--sources", default="fichier",
                     help="sources à utiliser, séparées par des virgules")
     a = ap.parse_args()
+    global SORTIE, SORTIE_DETAILS
+    if a.sortie:
+        SORTIE = os.path.join(ICI, a.sortie)
+        SORTIE_DETAILS = SORTIE.replace(".csv", "_DETAILS.csv")
+    EXCLURE_EN_PLUS.extend(os.path.join(ICI, f) for f in a.exclure)
     if a.etape == "liste-noire":
         charger_liste_noire()
     elif a.etape == "test-prenoms":
