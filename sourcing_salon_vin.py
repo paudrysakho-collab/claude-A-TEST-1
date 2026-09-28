@@ -167,6 +167,18 @@ VILLES = [
     ("Arzal", "56190", 47.5180, -2.3780, "56"),
     ("La Roche-Bernard", "56130", 47.5190, -2.3000, "56"),
     ("Notre-Dame-de-Monts", "85690", 46.8310, -2.1310, "85"),
+    ("Gétigné", "44190", 47.0770, -1.2480, "44"),
+    ("Gorges", "44190", 47.1010, -1.3030, "44"),
+    ("Saint-Lyphard", "44410", 47.3980, -2.3050, "44"),
+    ("Saint-Michel-Chef-Chef", "44730", 47.1810, -2.1490, "44"),
+    ("La Chapelle-Glain", "44670", 47.6200, -1.1950, "44"),
+    ("Saint-Paul-Mont-Penit", "85670", 46.8030, -1.6700, "85"),
+    ("Rocheservière", "85620", 46.9390, -1.5090, "85"),
+    ("Le Poiré-sur-Vie", "85170", 46.7680, -1.5090, "85"),
+    ("Chaumes-en-Retz", "44320", 47.1470, -1.9690, "44"),
+    ("Port-Saint-Père", "44710", 47.1320, -1.7490, "44"),
+    ("Préfailles", "44770", 47.1330, -2.2170, "44"),
+    ("Billiers", "56190", 47.5330, -2.4830, "56"),
     ("Jard-sur-Mer", "85520", 46.4140, -1.5750, "85"),
     ("La Tranche-sur-Mer", "85360", 46.3440, -1.4390, "85"),
     ("Brétignolles-sur-Mer", "85470", 46.6320, -1.8630, "85"),
@@ -193,7 +205,7 @@ def sans_accents(s):
 
 def normaliser_email(e):
     from urllib.parse import unquote
-    e = unquote((e or "").strip()).strip().lower()
+    e = unquote((e or "").strip()).strip().lower().replace("[^@]", "@")
     e = re.sub(r"^mailto:", "", e).split("?")[0].strip()
     return e.strip(" .,;:()<>[]\"'")
 
@@ -209,6 +221,21 @@ def cle_nom(nom):
     s = re.sub(r"^(l'|la |le |les |au |aux |a la |chez )", "", s.strip())
     s = re.sub(r"[^a-z0-9]+", "", s)
     return s
+
+
+MOTS_VIDES = {"restaurant", "brasserie", "bistrot", "bistro", "hotel", "cave", "chez", "maison", "cafe",
+              "bar", "les", "des", "aux", "and", "the", "sarl", "traiteur", "epicerie", "fromagerie"}
+
+
+def lien_nom_domaine(nom, dom):
+    """Vrai si un mot significatif du nom (ou le nom sans articles) apparaît dans le domaine."""
+    d = re.sub(r"[^a-z0-9]", "", sans_accents(dom.rsplit(".", 1)[0].lower()))
+    if not nom:
+        return True
+    if cle_nom(nom)[:6] in d:
+        return True
+    mots = [w for w in re.findall(r"[a-z0-9]+", sans_accents(nom.lower())) if len(w) >= 4 and w not in MOTS_VIDES]
+    return any(w in d for w in mots)
 
 
 def est_reseau(texte):
@@ -284,7 +311,12 @@ def charger_liste_noire(verbeux=True):
             print(f"  {k:9s}: {len(v - {''}):5d} e-mails")
         print(f"  TOTAL liste noire : {len(emails)} e-mails uniques, "
               f"{len(domaines)} domaines pros, {len(noms)} noms d'établissements")
-    return {"emails": emails, "domaines": domaines, "noms": noms}
+    generiques = {"contact", "info", "infos", "bonjour", "hello", "accueil", "reservation", "reservations",
+                  "resa", "commande", "commandes", "restaurant", "cave", "boutique", "magasin", "direction",
+                  "gerance", "admin", "office", "mail", "email", "traiteur", "epicerie", "fromagerie"}
+    locaux = {e.split("@")[0] for e in emails} - generiques
+    locaux = {l for l in locaux if len(l) >= 6}
+    return {"emails": emails, "domaines": domaines, "noms": noms, "locaux": locaux}
 
 
 def motif_rejet(email, nom, ln):
@@ -305,6 +337,8 @@ def motif_rejet(email, nom, ln):
     reseau = est_reseau(dom) or est_reseau(nom)
     if dom in ln["domaines"] and not reseau:
         return "établissement déjà connu (même domaine)"
+    if local in ln.get("locaux", ()) and not reseau:
+        return "établissement déjà connu (même adresse, autre fournisseur)"
     if "racines" not in ln:
         ln["racines"] = {d.rsplit(".", 1)[0] for d in ln["domaines"]}
     if dom.rsplit(".", 1)[0] in ln["racines"] and not reseau:
@@ -341,7 +375,8 @@ VOYELLES = "aeiouyhàâäéèêëîïôöùûüAEIOUYHÀÂÄÉÈÊËÎÏÔÖÙÛ
 def casse_propre(nom):
     """Remet en casse normale un nom tout en majuscules ou tout en minuscules."""
     if nom != nom.upper() and nom != nom.lower():
-        return nom
+        # corrige « L'atelier » -> « L'Atelier » dans un nom par ailleurs bien écrit
+        return re.sub(r"\b([LlDd])'([a-zà-ÿ])", lambda m: m.group(1) + "'" + m.group(2).upper(), nom)
     mots = []
     for i, m in enumerate(nom.lower().split()):
         if i > 0 and m in PETITS_MOTS:
@@ -357,7 +392,7 @@ def casse_propre(nom):
 
 def formule_equipe(nom):
     """Construit « à toute l'équipe de la/du/des/de l'/de X » à partir d'un nom brut."""
-    n = RE_FORME_JURIDIQUE.sub("", nom or "").strip(" -–,.")
+    n = RE_FORME_JURIDIQUE.sub("", (nom or "").replace("’", "'")).strip(" -–,.")
     n = re.sub(r"\s+", " ", n)
     if not n or len(n) > 60 or len(n) < 2 or re.search(r"[@/|]|http", n):
         return "à toute l'équipe"
@@ -574,6 +609,7 @@ def texte_et_liens(html, base):
 
 
 def desobfusquer(texte):
+    texte = texte.replace("[^@]", "@")  # masquage utilisé par certains sites de mairie
     t = re.sub(r"\s*[\[\(\{]\s*(?:at|arobase|@)\s*[\]\)\}]\s*", "@", texte, flags=re.I)
     t = re.sub(r"\s*[\[\(\{]\s*(?:dot|point)\s*[\]\)\}]\s*", ".", t, flags=re.I)
     return t
@@ -653,6 +689,7 @@ def blocs_annuaire(html):
         if not nom or "@" in nom or len(nom) > 70:
             lignes = [l.strip() for l in bloc.get_text("\n", strip=True).split("\n") if l.strip()]
             nom = next((l for l in lignes if "@" not in l and 2 < len(l) <= 70 and not re.search(r"\d{2}[ .]?\d{2}[ .]?\d{2}", l)), "")
+        nom = re.split(r"\s[|•–]\s|\s×", nom)[0].strip(" ,-")
         sortie.append((email, nom, bloc.get_text(" ", strip=True)))
     return sortie
 
@@ -811,6 +848,7 @@ def collecter(maximum, sources):
     print(f"  {len(candidats)} sites candidats")
 
     retenus, details, journal, sites_vus = {}, [], [], set()
+    douteux = []
 
     def retenir(email, nom, ville, cp, dist, cat, url_source, c, mentions=""):
         """Derniers contrôles puis ajout du contact. Renvoie True si retenu."""
@@ -819,8 +857,12 @@ def collecter(maximum, sources):
         hote_source = urlparse(c["url"]).netloc.replace("www.", "")
         if not r and c.get("fiche") and dom != hote_source and dom.split(".")[0] in hote_source:
             r = "adresse de l'annuaire lui-même"
-        if not r and c.get("fiche") and re.search(r"tourisme|mairie|agglo|^ot-|ville-|commune", dom):
+        if not r and c.get("fiche") and re.search(r"tourisme|mairie|agglo|^ot-|ville-|commune|vignoble", dom):
             r = "adresse d'un office de tourisme ou d'une mairie"
+        # Sur une fiche d'annuaire, l'adresse doit être un webmail ou porter le nom de l'établissement
+        # (sinon c'est souvent l'agence web ou l'éditeur de l'annuaire).
+        if not r and c.get("fiche") and dom not in WEBMAILS and not lien_nom_domaine(nom, dom):
+            r = "adresse sans lien avec le nom de l'établissement"
         if r:
             journal.append((c["url"], email, r))
             return False
@@ -882,10 +924,16 @@ def collecter(maximum, sources):
             for email, nom, bloc in blocs_annuaire(html):
                 if len(retenus) >= maximum:
                     break
-                if not nom:
-                    journal.append((c["url"], email, "nom introuvable dans l'annuaire"))
-                    continue
+                # Nom introuvable : on garde l'adresse, la formule sera « à toute l'équipe ».
                 cat, raison = qualifier(bloc, nom, seuil=1)
+                if not cat and raison == "restaurant sans vin mis en avant":
+                    # Validé avec l'utilisateur : restaurants traditionnels d'annuaire acceptés,
+                    # sauf pizzerias, crêperies, restauration rapide et bars PMU/tabac.
+                    if re.search(r"pizz|cr[eê]p|pmu|tabac|kebab|burger|snack|sushi|fast", nom.lower()) or \
+                            re.search(r"pizzeria|kebab|fast.food|sushi|bar.tabac|restauration rapide", bloc.lower()):
+                        journal.append((c["url"], email, f"{nom} : restauration rapide / crêperie"))
+                        continue
+                    cat = "Restaurant"
                 if not cat:
                     journal.append((c["url"], email, f"{nom} : {raison}"))
                     continue
@@ -956,6 +1004,12 @@ def collecter(maximum, sources):
         w = csv.writer(f)
         w.writerow(["url", "email", "raison"])
         w.writerows(journal)
+    with open(os.path.join(DOSSIER_CACHE, "douteux.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["email", "nom", "ville", "url", "extrait"])
+        w.writerows(douteux)
+    if douteux:
+        print(f"  {len(douteux)} restaurants d'annuaire à faire valider (cache/douteux.csv)")
     if nav.bloques:
         print("  Sites qui ont refusé le robot :", ", ".join(f"{h} ({r})" for h, r in list(nav.bloques.items())[:15]))
     print(f"→ {len(retenus)} contacts retenus, {len(journal)} rejets (cache/journal_rejets.csv)")
