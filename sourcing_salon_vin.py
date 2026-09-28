@@ -37,7 +37,7 @@ CANDIDATS = os.path.join(ICI, "candidats_sites.csv")
 USER_AGENT = "Mozilla/5.0 (compatible; SalonVinRairie-sourcing/1.0)"
 PAUSE_PAR_SITE = 1.5
 PONT_SAINT_MARTIN = (47.1239, -1.5836)
-RAYON_KM = 100
+RAYON_KM = 100.5  # 100 km, Sarzeau (100,3 km) toléré à la limite
 
 # --------------------------------------------------------------------------
 # Règles métier
@@ -46,7 +46,9 @@ SOUS_CHAINES_INTERDITES = ["le21pornic", "domainedeliziec", "camping", "gite",
                            "greta", "cfa", "chambre-hote"]
 LOCAUX_TECHNIQUES = ("noreply", "no-reply", "nepasrepondre", "webmaster", "rgpd",
                      "dpo", "privacy", "postmaster", "abuse", "support", "wordpress",
-                     "sentry", "example", "exemple", "votre", "your", "nom@", "email@")
+                     "sentry", "example", "exemple", "votre", "your", "nom@", "email@",
+                     "donneespersonnelles", "donnees-personnelles", "nomprenom", "prenom.nom",
+                     "mairie", "economie", "presse")
 EXTENSIONS_FICHIERS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".css", ".js")
 
 WEBMAILS = {"gmail.com", "orange.fr", "wanadoo.fr", "free.fr", "sfr.fr", "laposte.net",
@@ -61,11 +63,12 @@ WEBMAILS = {"gmail.com", "orange.fr", "wanadoo.fr", "free.fr", "sfr.fr", "lapost
 RESEAUX = ("biocoop", "caba", "cavavin", "nicolas", "vandb", "v-and-b", "lavieclaire",
            "la-vie-claire", "satoriz", "naturalia", "biocbon", "bio-c-bon", "intercaves",
            "repairedebacchus", "cellier", "marchedesterroirs", "latourdepise", "maisondv",
-           "bondici", "laperledesdieux", "beillevaire", "lacabaneafromages")
+           "bondici", "laperledesdieux", "beillevaire", "lacabaneafromages", "comptoirdesvignes",
+           "cavesbourdin", "lesvinsdepaulo", "papillesetpapillotes", "vinovini", "marcheauxvins", "comptoirdesvins", "leopold", "hameauxbio", "cervoiserie", "chopeetcompagnie")
 
 HOTES_AGENCES = ("wix", "ovh", "o2switch", "ionos", "1and1", "godaddy", "jimdo", "hostinger",
                  "gandi", "squarespace", "shopify", "webflow", "pagesjaunes", "solocal",
-                 "petitfute", "tripadvisor", "facebook", "instagram", "google", "sentry",
+                 "petitfute", "tripadvisor", "facebook", "instagram", "google", "sentry", "mondomaine",
                  "wordpress", "e-monsite", "sitew", "webself", "local.fr", "duckduckgo")
 
 MOTS_METIER = {
@@ -125,6 +128,50 @@ VILLES = [
     ("Vannes", "56000", 47.6586, -2.7600, "56"),
     ("Sarzeau", "56370", 47.5283, -2.7692, "56"),
     ("Auray", "56400", 47.6678, -2.9819, "56"),
+    # Communes voisines (secours quand l'API géographique ne répond pas)
+    ("Sèvremoine", "49450", 47.1230, -0.9920, "49"),
+    ("Orée-d'Anjou", "49270", 47.3370, -1.2640, "49"),
+    ("Mauges-sur-Loire", "49410", 47.3610, -1.0160, "49"),
+    ("Montrevault-sur-Èvre", "49110", 47.2590, -1.0460, "49"),
+    ("Chalonnes-sur-Loire", "49290", 47.3500, -0.7620, "49"),
+    ("Lys-Haut-Layon", "49310", 47.1460, -0.5290, "49"),
+    ("Mûrs-Érigné", "49610", 47.4000, -0.5510, "49"),
+    ("Sèvremont", "85700", 46.8330, -0.8630, "85"),
+    ("Pouzauges", "85700", 46.7810, -0.8370, "85"),
+    ("Mortagne-sur-Sèvre", "85290", 46.9920, -0.9500, "85"),
+    ("Chantonnay", "85110", 46.6870, -1.0500, "85"),
+    ("Luçon", "85400", 46.4550, -1.1660, "85"),
+    ("Mareuil-sur-Lay-Dissais", "85320", 46.5360, -1.2250, "85"),
+    ("Essarts-en-Bocage", "85140", 46.7730, -1.2290, "85"),
+    ("Aizenay", "85190", 46.7400, -1.6080, "85"),
+    ("Saint-Hilaire-de-Riez", "85270", 46.7210, -1.9460, "85"),
+    ("Talmont-Saint-Hilaire", "85440", 46.4660, -1.6170, "85"),
+    ("La Barre-de-Monts", "85550", 46.8830, -2.1210, "85"),
+    ("Beauvoir-sur-Mer", "85230", 46.9120, -2.0420, "85"),
+    ("L'Île-d'Yeu", "85350", 46.7220, -2.3480, "85"),
+    ("Mouzillon", "44330", 47.1400, -1.2810, "44"),
+    ("Saint-Père-en-Retz", "44320", 47.2060, -2.0410, "44"),
+    ("Le Pouliguen", "44510", 47.2700, -2.4310, "44"),
+    ("La Turballe", "44420", 47.3470, -2.5080, "44"),
+    ("Herbignac", "44410", 47.4480, -2.3180, "44"),
+    ("Pontchâteau", "44160", 47.4370, -2.0890, "44"),
+    ("Nort-sur-Erdre", "44390", 47.4380, -1.4980, "44"),
+    ("Nozay", "44170", 47.5650, -1.6270, "44"),
+    ("Derval", "44590", 47.6670, -1.6690, "44"),
+    ("Loireauxence", "44370", 47.3850, -1.0290, "44"),
+    ("Saint-Philbert-de-Grand-Lieu", "44310", 47.0360, -1.6400, "44"),
+    ("Legé", "44650", 46.8850, -1.5980, "44"),
+    ("Le Pellerin", "44640", 47.1990, -1.7550, "44"),
+    ("Paimboeuf", "44560", 47.2880, -2.0300, "44"),
+    ("Damgan", "56750", 47.5190, -2.5760, "56"),
+    ("Arzal", "56190", 47.5180, -2.3780, "56"),
+    ("La Roche-Bernard", "56130", 47.5190, -2.3000, "56"),
+    ("Notre-Dame-de-Monts", "85690", 46.8310, -2.1310, "85"),
+    ("Jard-sur-Mer", "85520", 46.4140, -1.5750, "85"),
+    ("La Tranche-sur-Mer", "85360", 46.3440, -1.4390, "85"),
+    ("Brétignolles-sur-Mer", "85470", 46.6320, -1.8630, "85"),
+    ("Le Loroux-Bottereau", "44430", 47.2380, -1.3470, "44"),
+    ("Saint-Julien-de-Concelles", "44450", 47.2530, -1.3850, "44"),
 ]
 PROFILS_RECHERCHE = ["épicerie fine", "caviste", "magasin bio", "fromagerie",
                      "torréfacteur café", "restaurant bistronomique", "maître restaurateur",
@@ -145,8 +192,9 @@ def sans_accents(s):
 
 
 def normaliser_email(e):
-    e = (e or "").strip().lower()
-    e = re.sub(r"^mailto:", "", e).split("?")[0]
+    from urllib.parse import unquote
+    e = unquote((e or "").strip()).strip().lower()
+    e = re.sub(r"^mailto:", "", e).split("?")[0].strip()
     return e.strip(" .,;:()<>[]\"'")
 
 
@@ -257,6 +305,10 @@ def motif_rejet(email, nom, ln):
     reseau = est_reseau(dom) or est_reseau(nom)
     if dom in ln["domaines"] and not reseau:
         return "établissement déjà connu (même domaine)"
+    if "racines" not in ln:
+        ln["racines"] = {d.rsplit(".", 1)[0] for d in ln["domaines"]}
+    if dom.rsplit(".", 1)[0] in ln["racines"] and not reseau:
+        return "établissement déjà connu (même nom de domaine, autre extension)"
     if nom and cle_nom(nom) in ln["noms"] and not reseau:
         return "établissement déjà connu (même nom)"
     return None
@@ -348,7 +400,16 @@ victor vincent virginie xavier yann yannick yves yvan zoe
 """.split())
 
 
+ACCENTS = {sans_accents(p).lower(): p for p in """
+Adèle Agnès Amélie Anaïs André Angélique Aurélie Aurélien Bénédicte Benoît Cécile Cédric Céline Chloé
+Clément Clémence Élodie Émilie Émeline Emmanuelle Étienne Françoise François Frédéric Gaël Gaëlle Gaëtan
+Gérard Grégory Hélène Hervé Jérémie Jérémy Jérôme Joël Laëtitia Léa Léo Loïc Mélanie Mickaël Mylène Noémie
+Pascale Raphaël Régis Rémi Sébastien Séverine Solène Stéphane Stéphanie Thibault Valérie Véronique Zoé
+""".split()}
+
+
 def joli_prenom(p):
+    p = ACCENTS.get(sans_accents(p).lower(), p)
     return "-".join(x[:1].upper() + x[1:].lower() for x in p.split("-"))
 
 
@@ -440,8 +501,11 @@ class Navigateur:
 
     def get(self, url):
         cache = os.path.join(DOSSIER_CACHE, hashlib.sha1(url.encode()).hexdigest() + ".html")
+        echec = cache[:-5] + ".echec"
         if os.path.exists(cache):
             return open(cache, encoding="utf-8", errors="ignore").read()
+        if os.path.exists(echec):  # page déjà tentée sans succès : on ne réessaie pas
+            return None
         hote = urlparse(url).netloc
         if not self._autorise(url):
             return None
@@ -452,6 +516,7 @@ class Navigateur:
             r = self.s.get(url, timeout=15)
         except Exception as ex:
             self.bloques[hote] = str(ex)[:80]
+            open(echec, "w").write(str(ex)[:200])
             return None
         finally:
             self.dernier[hote] = time.time()
@@ -459,6 +524,7 @@ class Navigateur:
             self.bloques[hote] = f"HTTP {r.status_code}"
             return None
         if r.status_code != 200 or "html" not in r.headers.get("content-type", "html"):
+            open(echec, "w").write(str(r.status_code))
             return None
         r.encoding = r.encoding or r.apparent_encoding
         open(cache, "w", encoding="utf-8").write(r.text)
@@ -470,10 +536,15 @@ class Navigateur:
         cle = os.path.join(DOSSIER_CACHE, "mx_" + dom)
         if os.path.exists(cle):
             return open(cle).read() == "1"
-        try:
-            j = self.s.get(f"https://dns.google/resolve?name={dom}&type=MX", timeout=10).json()
-            ok = any(a.get("type") == 15 for a in j.get("Answer", []))
-        except Exception:
+        for url in (f"https://dns.google/resolve?name={dom}&type=MX",
+                    f"https://cloudflare-dns.com/dns-query?name={dom}&type=MX"):
+            try:
+                j = self.s.get(url, timeout=10, headers={"Accept": "application/dns-json"}).json()
+                ok = any(a.get("type") == 15 for a in j.get("Answer", []))
+                break
+            except Exception:
+                continue
+        else:
             return True  # DNS indisponible : on ne rejette pas sur ce seul critère
         open(cle, "w").write("1" if ok else "0")
         return ok
@@ -483,6 +554,7 @@ class Navigateur:
 # 4. Extraction des e-mails d'un site
 # --------------------------------------------------------------------------
 RE_EMAIL = re.compile(r"[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+CHEMINS_FIXES = ("/contact", "/pages/contact", "/mentions-legales", "/policies/legal-notice")
 PAGES_CONTACT = ("contact", "nous-contacter", "mentions", "legal", "qui-sommes", "a-propos",
                  "apropos", "about", "equipe", "infos-pratiques", "acces")
 
@@ -491,6 +563,9 @@ def texte_et_liens(html, base):
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(html, "html.parser")
     mailtos = [a["href"] for a in soup.select("a[href^='mailto:']")]
+    for el in soup.select("[data-cfemail]"):
+        code = bytes.fromhex(el["data-cfemail"])
+        mailtos.append("".join(chr(b ^ code[0]) for b in code[1:]))
     liens = [urljoin(base, a["href"]) for a in soup.select("a[href]")]
     for t in soup(["script", "style", "noscript"]):
         t.decompose()
@@ -520,6 +595,16 @@ def explorer_site(nav, url):
             h = nav.get(l)
             if h:
                 pages.append((l, h))
+    base = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
+    for chemin in CHEMINS_FIXES:
+        if len(pages) >= 8:
+            break
+        l = base + chemin
+        if l not in vus:
+            vus.add(l)
+            h = nav.get(l)
+            if h:
+                pages.append((l, h))
     trouves, textes, mentions = {}, [], ""
     for u, h in pages:
         texte, mailtos, _, _ = texte_et_liens(h, u)
@@ -537,7 +622,42 @@ def explorer_site(nav, url):
 # --------------------------------------------------------------------------
 # 5. Qualification
 # --------------------------------------------------------------------------
-def qualifier(texte, titre):
+def blocs_annuaire(html):
+    """Découpe une page d'annuaire : pour chaque e-mail, (email, nom, texte du bloc de l'établissement)."""
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    for t in soup(["script", "style", "noscript", "header", "footer", "nav"]):
+        t.decompose()
+    sortie, vus = [], set()
+    noeuds = [(a, normaliser_email(a.get("href", ""))) for a in soup.select("a[href^='mailto:']")]
+    for el in soup.select("[data-cfemail]"):
+        code = bytes.fromhex(el["data-cfemail"])
+        noeuds.append((el, "".join(chr(b ^ code[0]) for b in code[1:]).lower()))
+    for txt in soup.find_all(string=RE_EMAIL):
+        for e in RE_EMAIL.findall(desobfusquer(str(txt))):
+            noeuds.append((txt.parent, normaliser_email(e)))
+    for noeud, email in noeuds:
+        if not email or email in vus:
+            continue
+        vus.add(email)
+        bloc = noeud
+        while bloc.parent is not None:
+            parent = bloc.parent
+            emails_parent = {normaliser_email(x) for x in RE_EMAIL.findall(parent.get_text(" "))}
+            emails_parent |= {normaliser_email(a.get("href", "")) for a in parent.select("a[href^='mailto:']")}
+            if len(emails_parent - {email}) > 0 or len(parent.get_text(" ", strip=True)) > 1500:
+                break
+            bloc = parent
+        titre = bloc.find(["h1", "h2", "h3", "h4", "h5", "strong", "b"])
+        nom = titre.get_text(" ", strip=True) if titre else ""
+        if not nom or "@" in nom or len(nom) > 70:
+            lignes = [l.strip() for l in bloc.get_text("\n", strip=True).split("\n") if l.strip()]
+            nom = next((l for l in lignes if "@" not in l and 2 < len(l) <= 70 and not re.search(r"\d{2}[ .]?\d{2}[ .]?\d{2}", l)), "")
+        sortie.append((email, nom, bloc.get_text(" ", strip=True)))
+    return sortie
+
+
+def qualifier(texte, titre, seuil=2):
     """(catégorie, raison_rejet). Catégorie None si le lieu ne parle pas de vin/bouche."""
     t = (titre + " " + texte).lower()
     tt = (titre or "").lower()
@@ -546,7 +666,7 @@ def qualifier(texte, titre):
             return None, f"hors cible (« {m} »)"
     scores = {cat: sum(t.count(m) for m in mots) for cat, mots in MOTS_METIER.items()}
     cat, score = max(scores.items(), key=lambda x: x[1])
-    if score < 2:
+    if score < seuil:
         return None, "activité non liée au vin"
     if cat == "Restaurant" and not any(w in t for w in ("vin", "cave", "sommelier", "accord")):
         return None, "restaurant sans vin mis en avant"
@@ -570,6 +690,15 @@ def localiser(texte, ville_hint=None):
             if v[0] == ville_hint:
                 return v[0], v[1], distance_km(PONT_SAINT_MARTIN, (v[2], v[3]))
     return None, None, None
+
+
+def ville_connue(nom_ville, cp=None):
+    """Distance via la table VILLES, à partir du nom de ville noté lors de la découverte."""
+    cle = cle_nom(nom_ville)
+    for v in VILLES:
+        if cle and cle_nom(v[0]) == cle:
+            return v[0], distance_km(PONT_SAINT_MARTIN, (v[2], v[3]))
+    return nom_ville or "", None
 
 
 def distance_par_cp(nav, cp):
@@ -682,14 +811,99 @@ def collecter(maximum, sources):
     print(f"  {len(candidats)} sites candidats")
 
     retenus, details, journal, sites_vus = {}, [], [], set()
+
+    def retenir(email, nom, ville, cp, dist, cat, url_source, c, mentions=""):
+        """Derniers contrôles puis ajout du contact. Renvoie True si retenu."""
+        dom = domaine(email)
+        r = motif_rejet(email, nom, ln)
+        hote_source = urlparse(c["url"]).netloc.replace("www.", "")
+        if not r and c.get("fiche") and dom != hote_source and dom.split(".")[0] in hote_source:
+            r = "adresse de l'annuaire lui-même"
+        if not r and c.get("fiche") and re.search(r"tourisme|mairie|agglo|^ot-|ville-|commune", dom):
+            r = "adresse d'un office de tourisme ou d'une mairie"
+        if r:
+            journal.append((c["url"], email, r))
+            return False
+        if email in retenus:
+            return False
+        if not nav.a_un_mx(dom):
+            journal.append((c["url"], email, "domaine sans serveur mail"))
+            return False
+        prenom = trouver_prenom(mentions, email) or formule_equipe(nom)
+        retenus[email] = prenom
+        ln["noms"].add(cle_nom(nom))
+        if dom not in WEBMAILS:
+            ln["domaines"].add(dom)
+        details.append({"Email": email, "Prenom": prenom, "Etablissement": nom, "Ville": ville or "",
+                        "CP": cp or "", "Distance_km": round(dist), "Categorie": cat,
+                        "URL_preuve": url_source, "Source": c.get("source", ""),
+                        "Date": time.strftime("%Y-%m-%d")})
+        print(f"  ✔ {len(retenus):3d}  {email:42s} {prenom[:45]:45s} {ville} ({cat})")
+        return True
+
+    # Pré-visite en parallèle de sites différents (8 à la fois). Chaque site reste visité
+    # page par page avec sa pause ; les pages sont mises en cache pour la boucle ci-dessous.
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    local = threading.local()
+
+    def previsiter(c):
+        if not hasattr(local, "nav"):
+            local.nav = Navigateur()
+        try:
+            if c.get("fiche") == "annuaire":
+                local.nav.get(c["url"])
+            else:
+                explorer_site(local.nav, c["url"])
+        except Exception:
+            pass
+
+    a_voir, deja = [], set()
+    for c in candidats:
+        cle = c["url"] if c.get("fiche") else urlparse(c["url"]).netloc
+        if cle not in deja:
+            deja.add(cle)
+            a_voir.append(c)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(previsiter, a_voir))
+
     for c in candidats:
         if len(retenus) >= maximum:
             break
-        hote = urlparse(c["url"]).netloc.replace("www.", "")
-        if not hote or hote in sites_vus:
+        if c.get("fiche") == "annuaire":
+            # Page d'annuaire (mairie, office de tourisme) : plusieurs établissements par page.
+            if c["url"] in sites_vus:
+                continue
+            sites_vus.add(c["url"])
+            html = nav.get(c["url"])
+            if not html:
+                journal.append((c["url"], "", "annuaire inaccessible"))
+                continue
+            for email, nom, bloc in blocs_annuaire(html):
+                if len(retenus) >= maximum:
+                    break
+                if not nom:
+                    journal.append((c["url"], email, "nom introuvable dans l'annuaire"))
+                    continue
+                cat, raison = qualifier(bloc, nom, seuil=1)
+                if not cat:
+                    journal.append((c["url"], email, f"{nom} : {raison}"))
+                    continue
+                ville, cp, dist = localiser(bloc, c.get("ville"))
+                if dist is None:
+                    ville, dist = ville_connue(c.get("ville"))
+                if dist is None or dist > RAYON_KM:
+                    journal.append((c["url"], email, f"hors zone ({cp or '?'})"))
+                    continue
+                retenir(email, nom, ville, cp, dist, cat, c["url"], c)
             continue
-        sites_vus.add(hote)
-        if hote in ln["domaines"] and not est_reseau(hote):
+        hote = urlparse(c["url"]).netloc.replace("www.", "")
+        cle_site = c["url"] if c.get("fiche") == "1" else hote
+        if not hote or cle_site in sites_vus:
+            continue
+        sites_vus.add(cle_site)
+        if (hote in ln["domaines"] or hote.rsplit(".", 1)[0] in {d.rsplit(".", 1)[0] for d in ln["domaines"]}) \
+                and not est_reseau(hote):
             journal.append((c["url"], "", "site déjà connu"))
             continue
         info = explorer_site(nav, c["url"])
@@ -697,12 +911,18 @@ def collecter(maximum, sources):
             journal.append((c["url"], "", "aucun e-mail public"))
             continue
         cat, raison = qualifier(info["texte"], info["titre"])
+        if not cat and raison == "activité non liée au vin" and c.get("categorie"):
+            cat = c["categorie"]
         if not cat:
             journal.append((c["url"], "", raison))
             continue
         ville, cp, dist = localiser(info["texte"], c.get("ville"))
         if cp and dist is None:
-            ville, dist = distance_par_cp(nav, cp)
+            v_api, d_api = distance_par_cp(nav, cp)
+            if d_api is not None:
+                ville, dist = v_api, d_api
+            else:
+                ville, dist = ville_connue(c.get("ville"), cp)
         if dist is None or dist > RAYON_KM:
             journal.append((c["url"], "", f"hors zone ({cp or '?'})"))
             continue
@@ -712,31 +932,24 @@ def collecter(maximum, sources):
                         key=lambda kv: (domaine(kv[0]) != hote, not kv[0].startswith(("contact", "info", "bonjour"))))
         for email, url_source in emails:
             dom = domaine(email)
-            if dom != hote and dom not in WEBMAILS:
+            marque = dom.rsplit(".", 1)[0].split(".")[-1]
+            if dom != hote and dom not in WEBMAILS and marque not in hote and c.get("fiche") != "1":
                 journal.append((c["url"], email, "domaine étranger au site"))
                 continue
             r = motif_rejet(email, nom, ln)
-            if r:
+            if r and r.startswith("établissement"):
                 journal.append((c["url"], email, r))
-                if r.startswith("établissement"):
-                    break
+                break
+            reseau = est_reseau(hote) or est_reseau(nom)
+            local = email.split("@")[0]
+            if reseau and (local in ("contact", "info", "bonjour", "hello", "commande", "service",
+                                     "serviceclient", "service-client")
+                           or any(x.replace("-", "") in local.replace("-", "") for x in RESEAUX)):
+                journal.append((c["url"], email, "adresse du siège du réseau, pas du magasin"))
                 continue
-            if email in retenus:
-                continue
-            if not nav.a_un_mx(dom):
-                journal.append((c["url"], email, "domaine sans serveur mail"))
-                continue
-            prenom = trouver_prenom(info["mentions"], email) or formule_equipe(nom)
-            retenus[email] = prenom
-            ln["noms"].add(cle_nom(nom))
-            if dom not in WEBMAILS:
-                ln["domaines"].add(dom)
-            details.append({"Email": email, "Prenom": prenom, "Etablissement": nom, "Ville": ville or "",
-                            "CP": cp or "", "Distance_km": round(dist), "Categorie": cat,
-                            "URL_preuve": url_source, "Source": c.get("source", ""),
-                            "Date": time.strftime("%Y-%m-%d")})
-            print(f"  ✔ {len(retenus):3d}  {email:42s} {prenom[:45]:45s} {ville} ({cat})")
-            break
+            if retenir(email, nom, ville, cp, dist, cat, url_source, c,
+                       "" if reseau else info["mentions"]):
+                break
 
     ecrire(retenus, details)
     with open(os.path.join(DOSSIER_CACHE, "journal_rejets.csv"), "w", newline="", encoding="utf-8") as f:
@@ -807,7 +1020,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("etape", choices=["liste-noire", "test-prenoms", "collecter", "verifier"])
     ap.add_argument("--max", type=int, default=100)
-    ap.add_argument("--sources", default="fichier,petitfute,recherche",
+    ap.add_argument("--sources", default="fichier",
                     help="sources à utiliser, séparées par des virgules")
     a = ap.parse_args()
     if a.etape == "liste-noire":
