@@ -14,9 +14,17 @@ restaurants…) autour de Pont-Saint-Martin, sans jamais recontacter une adresse
 ```
 python sourcing_salon_vin.py liste-noire     # compte les adresses exclues (5 476 attendues)
 python sourcing_salon_vin.py test-prenoms    # teste les formules « à toute l'équipe de… »
-python sourcing_salon_vin.py collecter --max 100
+python sourcing_salon_vin.py collecter --max 124 --sources fichier,vendee
 python sourcing_salon_vin.py verifier        # contrôle 0 doublon, 0 collision, format Email,Prenom
 ```
+
+## Sources utilisées
+- `candidats_sites.csv` : sites trouvés par recherche web (colonne `fiche` : vide = site de
+  l'établissement, `1` = fiche d'un seul établissement, `annuaire` = page listant plusieurs
+  établissements, comme les mairies ou annuher.com).
+- `vendee` : fiches publiques de Vendée Tourisme (Maître Restaurateur, gastronomique,
+  traditionnel), où l'e-mail est affiché ; pizzerias, crêperies et restauration rapide exclues.
+- Petit Futé, PagesJaunes et les moteurs de recherche bloquent les robots : ils ne sont pas utilisés.
 
 ## Résultats
 - `NOUVEAUX_CONTACTS_CLAUDE_CODE.csv` : colonnes `Email,Prenom`, prêt pour l'envoi.

@@ -326,6 +326,8 @@ def motif_rejet(email, nom, ln):
         return "format invalide"
     if e in ln["emails"]:
         return "doublon (déjà dans les 4 fichiers)"
+    if any(x in e for x in EXCLUSIONS_VALIDEES):
+        return "exclu après validation (chaîne, snack, cuisine étrangère)"
     for s in SOUS_CHAINES_INTERDITES:
         if s in e:
             return f"sous-chaîne interdite « {s} »"
@@ -407,7 +409,7 @@ def formule_equipe(nom):
     if bas.startswith(("l'", "l’")):
         reste = n[2:]
         return f"à toute l'équipe de l'{reste[:1].upper()}{reste[1:]}"
-    premier = sans_accents(bas.split()[0]).strip("'’")
+    premier = sans_accents(bas.split()[0]).strip("'’").split("-")[0]  # « Hôtel-Restaurant » -> « hotel »
     for article, mots in GENRE.items():
         if premier in mots:
             return f"à toute l'équipe {article}{'' if article.endswith(chr(39)) else ' '}{n}"
@@ -512,6 +514,11 @@ def test_prenoms():
 # --------------------------------------------------------------------------
 # 3. Accès web poli (cache, robots.txt, pause par site)
 # --------------------------------------------------------------------------
+import threading
+_VERROU_HOTES = threading.Lock()
+_DERNIER_APPEL = {}  # hôte -> heure du dernier appel, partagé par tous les robots (politesse)
+
+
 class Navigateur:
     def __init__(self):
         import requests
@@ -544,8 +551,12 @@ class Navigateur:
         hote = urlparse(url).netloc
         if not self._autorise(url):
             return None
-        attente = PAUSE_PAR_SITE - (time.time() - self.dernier.get(hote, 0))
-        if attente > 0:
+        while True:  # au plus une requête toutes les PAUSE_PAR_SITE secondes par site, tous robots confondus
+            with _VERROU_HOTES:
+                attente = PAUSE_PAR_SITE - (time.time() - _DERNIER_APPEL.get(hote, 0))
+                if attente <= 0:
+                    _DERNIER_APPEL[hote] = time.time()
+                    break
             time.sleep(attente)
         try:
             r = self.s.get(url, timeout=15)
@@ -553,8 +564,6 @@ class Navigateur:
             self.bloques[hote] = str(ex)[:80]
             open(echec, "w").write(str(ex)[:200])
             return None
-        finally:
-            self.dernier[hote] = time.time()
         if r.status_code in (403, 429, 503):
             self.bloques[hote] = f"HTTP {r.status_code}"
             return None
@@ -743,16 +752,26 @@ def distance_par_cp(nav, cp):
     if os.path.exists(cle):
         d = json.load(open(cle))
     else:
+        d = None
         try:
             d = nav.s.get(f"https://geo.api.gouv.fr/communes?codePostal={cp}&fields=nom,centre",
                           timeout=10).json()
+            d = [{"nom": x["nom"], "lon": x["centre"]["coordinates"][0], "lat": x["centre"]["coordinates"][1]} for x in d]
         except Exception:
-            return None, None
+            try:
+                j = nav.s.get(f"https://api-adresse.data.gouv.fr/search/?q={cp}&type=municipality&postcode={cp}&limit=1",
+                              timeout=10).json()
+                d = [{"nom": f["properties"]["city"], "lon": f["geometry"]["coordinates"][0],
+                      "lat": f["geometry"]["coordinates"][1]} for f in j.get("features", [])]
+            except Exception:
+                return None, None
         json.dump(d, open(cle, "w"))
     if not d:
         return None, None
-    lon, lat = d[0]["centre"]["coordinates"]
-    return d[0]["nom"], distance_km(PONT_SAINT_MARTIN, (lat, lon))
+    x = d[0]
+    if "centre" in x:  # ancien format du cache (geo.api.gouv.fr brut)
+        x = {"nom": x["nom"], "lon": x["centre"]["coordinates"][0], "lat": x["centre"]["coordinates"][1]}
+    return x["nom"], distance_km(PONT_SAINT_MARTIN, (x["lat"], x["lon"]))
 
 
 # --------------------------------------------------------------------------
@@ -824,6 +843,62 @@ def candidats_recherche(nav, villes, profils, max_requetes=200):
     return sortie
 
 
+VT_BASE = "https://www.vendee-tourisme.com/restaurants-en-vendee"
+VT_FILTRES = ["/search_api_cluster_4/Maitre%20Restaurateur", "/search_api_cluster_3/Gastronomique",
+              "/search_api_cluster_3/Traditionnel"]
+RE_VT_FICHE = re.compile(r"https://www\.vendee-tourisme\.com/[a-z0-9-]+/[a-z0-9-]+/respdl\w+")
+RE_HORS_PROFIL = re.compile(r"pizz|cr[eê]p|cuisine du monde|sur le pouce|restauration rapide|kebab|burger|"
+                            r"sushi|asiat|snack|food.?truck|glacier|friterie|tacos|chinois|japonais|indien", re.I)
+
+
+# Exclusions validées avec l'utilisateur (chaînes, snacks, cuisines étrangères) — 28/09/2026.
+EXCLUSIONS_VALIDEES = ("les3brasseurs.com", "pankeming@", "frenzi.fr", "redzone-challans.fr",
+                       "snack-a-manu@", "la-boucherie.fr")
+
+
+def candidats_vendee_tourisme(nav, max_pages=40):
+    """Liste les fiches restaurants de Vendée Tourisme (Maître Restaurateur, gastronomique, traditionnel)."""
+    fiches = []
+    for filtre in VT_FILTRES:
+        vues = set()
+        for p in range(max_pages):
+            html = nav.get(VT_BASE + filtre + (f"?page={p}" if p else "")) or ""
+            nouvelles = [f for f in dict.fromkeys(RE_VT_FICHE.findall(html)) if f not in vues]
+            if not nouvelles:
+                break
+            vues.update(nouvelles)
+            fiches += [{"nom": "", "ville": "", "url": f, "categorie": "restaurant", "fiche": "tourinsoft",
+                        "source": "Vendée Tourisme " + filtre.rsplit("/", 1)[-1].replace("%20", " ")}
+                       for f in nouvelles]
+    print(f"  Vendée Tourisme : {len(fiches)} fiches restaurants")
+    return list({f["url"]: f for f in fiches}.values())
+
+
+def lire_fiche_tourinsoft(html):
+    """(nom, email, cp, type, texte) d'une fiche Vendée Tourisme."""
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    h1 = soup.find("h1")
+    nom = h1.get_text(" ", strip=True) if h1 else ""
+    # « Les Dunes - Restaurant traditionnel » -> « Les Dunes »
+    court = re.sub(r"\s+-\s+(Restaurant|Gastronomique|Traiteur|Resto|Bar|La Table|Brasserie|Cuisine)\b.*$", "",
+                   nom, flags=re.I).strip()
+    # « Bar - Restaurant Le Bon Androie » : on ne garde pas un simple « Bar »
+    nom = court if court.lower() not in ("bar", "restaurant", "brasserie", "hôtel", "hotel", "") \
+        else re.sub(r"\s+-\s+", " ", nom)
+    texte = soup.get_text(" ", strip=True)
+    m = re.search(r"Envoyer un e-mail\s+([A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})", texte)
+    email = normaliser_email(m.group(1)) if m else ""
+    contact = texte[texte.find("Contact"):] if "Contact" in texte else texte
+    mcp = re.search(r"\b(85\d{3}|44\d{3}|49\d{3}|79\d{3}|17\d{3})\b", contact)
+    # Le type (« Cuisine traditionnelle », « Pizzeria »…) suit le nom dans le bandeau de la fiche,
+    # avant « Voir sur la carte » ; on ignore le bloc « Vous aimerez aussi ».
+    utile = texte.split("Vous aimerez aussi")[0]
+    i = utile.find("Voir sur la carte")
+    debut = utile[max(0, i - 160):i] if i > 0 else utile[:300]
+    return nom, email, (mcp.group(1) if mcp else ""), debut, texte
+
+
 def nom_depuis_titre(titre, hote):
     t = re.split(r"\s[|\-–—:•]\s", titre or "")[0].strip()
     if 2 <= len(t) <= 50 and not re.search(r"accueil|home|bienvenue|site officiel", t, re.I):
@@ -842,6 +917,9 @@ def collecter(maximum, sources):
     if "petitfute" in sources:
         print("→ Petit Futé…")
         candidats += candidats_petit_fute(nav)
+    if "vendee" in sources:
+        print("→ Vendée Tourisme…")
+        candidats += candidats_vendee_tourisme(nav)
     if "recherche" in sources:
         print("→ Moteur de recherche…")
         candidats += candidats_recherche(nav, VILLES, PROFILS_RECHERCHE)
@@ -944,6 +1022,30 @@ def collecter(maximum, sources):
                     journal.append((c["url"], email, f"hors zone ({cp or '?'})"))
                     continue
                 retenir(email, nom, ville, cp, dist, cat, c["url"], c)
+            continue
+        if c.get("fiche") == "tourinsoft":
+            if c["url"] in sites_vus:
+                continue
+            sites_vus.add(c["url"])
+            html = nav.get(c["url"])
+            if not html:
+                journal.append((c["url"], "", "fiche inaccessible"))
+                continue
+            nom, email, cp, debut, texte = lire_fiche_tourinsoft(html)
+            if not email:
+                journal.append((c["url"], "", f"{nom} : pas d'e-mail sur la fiche"))
+                continue
+            if RE_HORS_PROFIL.search(nom + " " + debut):
+                journal.append((c["url"], email, f"{nom} : hors profil (pizzeria, crêperie, rapide…)"))
+                continue
+            if re.search("|".join(MOTS_INTERDITS), (nom + " " + debut).lower()):
+                journal.append((c["url"], email, f"{nom} : hors cible"))
+                continue
+            ville, dist = distance_par_cp(nav, cp) if cp else (None, None)
+            if dist is None or dist > RAYON_KM:
+                journal.append((c["url"], email, f"{nom} : hors zone ({cp or '?'})"))
+                continue
+            retenir(email, nom, ville, cp, dist, "Restaurant", c["url"], c)
             continue
         hote = urlparse(c["url"]).netloc.replace("www.", "")
         cle_site = c["url"] if c.get("fiche") == "1" else hote
