@@ -1,0 +1,824 @@
+#!/usr/bin/env python3
+"""Sourcing de nouveaux contacts pros pour le Salon du Vin du 5 octobre 2026
+(Château de la Rairie, Pont-Saint-Martin).
+
+Étapes :
+    python sourcing_salon_vin.py liste-noire      # charge et compte les exclusions
+    python sourcing_salon_vin.py test-prenoms     # vérifie le formateur de la colonne Prenom
+    python sourcing_salon_vin.py collecter --max 100
+    python sourcing_salon_vin.py verifier         # contrôle indépendant du livrable
+
+Les 4 fichiers sources sont lus dans donnees_sources/ (non versionné).
+Des sites supplémentaires peuvent être fournis dans candidats_sites.csv
+(colonnes : nom,ville,url,categorie).
+"""
+import argparse
+import csv
+import glob
+import hashlib
+import json
+import math
+import os
+import random
+import re
+import sys
+import time
+import unicodedata
+import urllib.robotparser
+from urllib.parse import urljoin, urlparse, quote_plus
+
+ICI = os.path.dirname(os.path.abspath(__file__))
+DOSSIER_SOURCES = os.path.join(ICI, "donnees_sources")
+DOSSIER_CACHE = os.path.join(ICI, "cache")
+SORTIE = os.path.join(ICI, "NOUVEAUX_CONTACTS_CLAUDE_CODE.csv")
+SORTIE_DETAILS = os.path.join(ICI, "NOUVEAUX_CONTACTS_DETAILS.csv")
+CANDIDATS = os.path.join(ICI, "candidats_sites.csv")
+
+USER_AGENT = "Mozilla/5.0 (compatible; SalonVinRairie-sourcing/1.0)"
+PAUSE_PAR_SITE = 1.5
+PONT_SAINT_MARTIN = (47.1239, -1.5836)
+RAYON_KM = 100
+
+# --------------------------------------------------------------------------
+# Règles métier
+# --------------------------------------------------------------------------
+SOUS_CHAINES_INTERDITES = ["le21pornic", "domainedeliziec", "camping", "gite",
+                           "greta", "cfa", "chambre-hote"]
+LOCAUX_TECHNIQUES = ("noreply", "no-reply", "nepasrepondre", "webmaster", "rgpd",
+                     "dpo", "privacy", "postmaster", "abuse", "support", "wordpress",
+                     "sentry", "example", "exemple", "votre", "your", "nom@", "email@")
+EXTENSIONS_FICHIERS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".css", ".js")
+
+WEBMAILS = {"gmail.com", "orange.fr", "wanadoo.fr", "free.fr", "sfr.fr", "laposte.net",
+            "hotmail.com", "hotmail.fr", "outlook.com", "outlook.fr", "yahoo.fr",
+            "yahoo.com", "icloud.com", "bbox.fr", "live.fr", "live.com", "aol.com",
+            "aol.fr", "neuf.fr", "club-internet.fr", "numericable.fr", "gmx.fr",
+            "gmx.com", "me.com", "msn.com", "protonmail.com", "proton.me", "cegetel.net",
+            "9online.fr", "aliceadsl.fr", "orange.com"}
+
+# Réseaux multi-magasins : chaque magasin est un acheteur distinct, on ne bloque
+# donc pas un nouveau magasin parce qu'un autre magasin du réseau est déjà connu.
+RESEAUX = ("biocoop", "caba", "cavavin", "nicolas", "vandb", "v-and-b", "lavieclaire",
+           "la-vie-claire", "satoriz", "naturalia", "biocbon", "bio-c-bon", "intercaves",
+           "repairedebacchus", "cellier", "marchedesterroirs", "latourdepise", "maisondv",
+           "bondici", "laperledesdieux", "beillevaire", "lacabaneafromages")
+
+HOTES_AGENCES = ("wix", "ovh", "o2switch", "ionos", "1and1", "godaddy", "jimdo", "hostinger",
+                 "gandi", "squarespace", "shopify", "webflow", "pagesjaunes", "solocal",
+                 "petitfute", "tripadvisor", "facebook", "instagram", "google", "sentry",
+                 "wordpress", "e-monsite", "sitew", "webself", "local.fr", "duckduckgo")
+
+MOTS_METIER = {
+    "Caviste": ["caviste", "cave à vin", "cave a vin", "vins et spiritueux", "bar à vin",
+                "bar a vin", "cave à manger", "vins naturels", "vigneron"],
+    "Épicerie fine": ["épicerie fine", "epicerie fine", "comptoir gourmand", "produits du terroir",
+                      "coffret", "épicerie", "epicerie", "délicatesse"],
+    "Magasin bio": ["biocoop", "magasin bio", "produits bio", "agriculture biologique", "vrac"],
+    "Fromagerie": ["fromagerie", "fromager", "crèmerie", "cremerie", "affineur"],
+    "Torréfacteur": ["torréfacteur", "torrefacteur", "torréfaction", "brûlerie", "brulerie"],
+    "Restaurant": ["bistronomi", "maître restaurateur", "maitre restaurateur", "bistrot",
+                   "restaurant", "carte des vins", "fait maison", "cuisine de saison"],
+    "Bar à vins / tapas": ["bar à vins", "bar a vins", "tapas"],
+    "Cave à bières / spiritueux": ["bières", "bieres", "whisky", "rhum", "spiritueux"],
+    "Traiteur": ["traiteur", "réception", "mariage"],
+    "Hôtel-restaurant": ["hôtel-restaurant", "hotel-restaurant", "hôtel restaurant", "logis"],
+}
+MOTS_INTERDITS = ["camping", "gîte", "gite rural", "chambre d'hôte", "chambres d'hôtes",
+                  "chambre d'hote", "lycée", "lycee", "école", "cfa ", "greta", "fast-food",
+                  "fast food", "kebab", "tacos", "burger king", "mcdonald", "pizza à emporter",
+                  "sandwicherie", "auto-école", "coiffure", "immobili", "pharmacie"]
+
+# Villes cibles (sous-exploitées d'abord), avec coordonnées de secours.
+VILLES = [
+    # (ville, code postal, lat, lon, département)
+    ("Noirmoutier-en-l'Île", "85330", 47.0009, -2.2500, "85"),
+    ("Savenay", "44260", 47.3606, -1.9428, "44"),
+    ("Muzillac", "56190", 47.5542, -2.4800, "56"),
+    ("Vallet", "44330", 47.1617, -1.2661, "44"),
+    ("Châteaubriant", "44110", 47.7172, -1.3761, "44"),
+    ("Challans", "85300", 46.8467, -1.8783, "85"),
+    ("Saint-Brevin-les-Pins", "44250", 47.2464, -2.1667, "44"),
+    ("Le Croisic", "44490", 47.2919, -2.5100, "44"),
+    ("Pornichet", "44380", 47.2486, -2.3394, "44"),
+    ("Fontenay-le-Comte", "85200", 46.4661, -0.8064, "85"),
+    ("Clisson", "44190", 47.0869, -1.2819, "44"),
+    ("Blain", "44130", 47.4764, -1.7625, "44"),
+    ("Basse-Goulaine", "44115", 47.2117, -1.4675, "44"),
+    ("Machecoul-Saint-Même", "44270", 46.9931, -1.8214, "44"),
+    ("Vertou", "44120", 47.1689, -1.4697, "44"),
+    ("Beaupréau-en-Mauges", "49600", 47.2036, -0.9886, "49"),
+    ("Chemillé-en-Anjou", "49120", 47.2139, -0.7275, "49"),
+    ("Guérande", "44350", 47.3283, -2.4294, "44"),
+    ("La Baule-Escoublac", "44500", 47.2867, -2.3908, "44"),
+    ("Saint-Nazaire", "44600", 47.2736, -2.2139, "44"),
+    ("Ancenis-Saint-Géréon", "44150", 47.3656, -1.1775, "44"),
+    ("Pornic", "44210", 47.1156, -2.1025, "44"),
+    ("Saint-Jean-de-Monts", "85160", 46.7911, -2.0617, "85"),
+    ("Saint-Gilles-Croix-de-Vie", "85800", 46.6975, -1.9456, "85"),
+    ("Les Sables-d'Olonne", "85100", 46.4972, -1.7833, "85"),
+    ("La Roche-sur-Yon", "85000", 46.6706, -1.4269, "85"),
+    ("Montaigu-Vendée", "85600", 46.9731, -1.3094, "85"),
+    ("Les Herbiers", "85500", 46.8711, -1.0136, "85"),
+    ("Cholet", "49300", 47.0600, -0.8792, "49"),
+    ("Saumur", "49400", 47.2600, -0.0769, "49"),
+    ("Doué-en-Anjou", "49700", 47.1928, -0.2758, "49"),
+    ("Vannes", "56000", 47.6586, -2.7600, "56"),
+    ("Sarzeau", "56370", 47.5283, -2.7692, "56"),
+    ("Auray", "56400", 47.6678, -2.9819, "56"),
+]
+PROFILS_RECHERCHE = ["épicerie fine", "caviste", "magasin bio", "fromagerie",
+                     "torréfacteur café", "restaurant bistronomique", "maître restaurateur",
+                     "bar à vins", "traiteur", "cave à bières"]
+PETIT_FUTE_DEPARTEMENTS = {
+    "44": "https://www.petitfute.com/d55-loire-atlantique/",
+    "85": "https://www.petitfute.com/d76-vendee/",
+    "49": "https://www.petitfute.com/d73-maine-et-loire/",
+}
+MOTS_RUBRIQUES_PF = ("c650", "produits-gourmands", "epicerie", "cave", "vins", "fromag",
+                     "gastronomie", "terroir", "c1165", "bistrot", "restaurant")
+
+# --------------------------------------------------------------------------
+# Outils texte
+# --------------------------------------------------------------------------
+def sans_accents(s):
+    return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+
+
+def normaliser_email(e):
+    e = (e or "").strip().lower()
+    e = re.sub(r"^mailto:", "", e).split("?")[0]
+    return e.strip(" .,;:()<>[]\"'")
+
+
+def domaine(email):
+    return email.rsplit("@", 1)[-1] if "@" in email else ""
+
+
+def cle_nom(nom):
+    """Clé de comparaison d'un nom d'établissement : sans accents, articles ni formes juridiques."""
+    s = sans_accents((nom or "").lower())
+    s = re.sub(r"\b(sarl|sas|sasu|eurl|sa|snc|ets|etablissements?)\b", " ", s)
+    s = re.sub(r"^(l'|la |le |les |au |aux |a la |chez )", "", s.strip())
+    s = re.sub(r"[^a-z0-9]+", "", s)
+    return s
+
+
+def est_reseau(texte):
+    t = sans_accents((texte or "").lower()).replace(" ", "")
+    return any(r.replace("-", "") in t for r in RESEAUX)
+
+
+def distance_km(a, b):
+    la1, lo1, la2, lo2 = map(math.radians, (*a, *b))
+    h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2
+    return 6371 * 2 * math.asin(math.sqrt(h))
+
+
+# --------------------------------------------------------------------------
+# 1. Liste noire
+# --------------------------------------------------------------------------
+def _trouver(motif):
+    fichiers = sorted(glob.glob(os.path.join(DOSSIER_SOURCES, motif)))
+    if not fichiers:
+        sys.exit(f"Fichier introuvable dans {DOSSIER_SOURCES} : {motif}")
+    return fichiers[-1]
+
+
+def _lire_xlsx(chemin, feuille=None):
+    import openpyxl
+    wb = openpyxl.load_workbook(chemin, read_only=True, data_only=True)
+    ws = wb[feuille] if feuille else wb.worksheets[0]
+    lignes = ws.iter_rows(values_only=True)
+    entete = [str(c).strip() if c is not None else "" for c in next(lignes)]
+    return [dict(zip(entete, ["" if v is None else str(v) for v in l])) for l in lignes]
+
+
+def _col(ligne, nom):
+    """Lecture tolérante d'une colonne (espaces finaux dans les en-têtes Google Forms)."""
+    for k, v in ligne.items():
+        if k.strip() == nom.strip():
+            return v
+    return ""
+
+
+RE_FORMULE = re.compile(r"^à toute l'équipe (?:de la |du |des |de l'|d'|de )(.+)$")
+
+
+def charger_liste_noire(verbeux=True):
+    master = _lire_xlsx(_trouver("*Master_tous_les_contacts*.xlsx"), "Tous les contacts")
+    inscr = _lire_xlsx(_trouver("*Inscription*.xlsx"))
+    fusion = list(csv.DictReader(open(_trouver("*CSV_ENVOI_FUSION_NEUFS*.csv"), encoding="utf-8-sig")))
+    lundi = list(csv.DictReader(open(_trouver("*CSV_ENVOI_LUNDI_4_LOTS_1*.csv"), encoding="utf-8-sig")))
+
+    par_source = {
+        "Master": {normaliser_email(r.get("Email")) for r in master},
+        "Fusion": {normaliser_email(r.get("Email")) for r in fusion},
+        "Lundi": {normaliser_email(r.get("Email")) for r in lundi},
+        "Inscrits": {normaliser_email(_col(r, c)) for r in inscr
+                     for c in ("Adresse e-mail à laquelle vous souhaitez communiquer", "Adresse e-mail")},
+    }
+    emails = set().union(*par_source.values()) - {""}
+
+    domaines = {domaine(e) for e in emails} - WEBMAILS - {""}
+    noms = set()
+    for r in master:
+        noms.add(cle_nom(r.get("Établissement")))
+    for r in inscr:
+        noms.add(cle_nom(_col(r, "Nom de la société / Établissement")))
+    for r in fusion + lundi:
+        m = RE_FORMULE.match((r.get("Prenom") or "").strip())
+        if m:
+            noms.add(cle_nom(m.group(1)))
+    noms = {n for n in noms if len(n) >= 4}
+
+    if verbeux:
+        for k, v in par_source.items():
+            print(f"  {k:9s}: {len(v - {''}):5d} e-mails")
+        print(f"  TOTAL liste noire : {len(emails)} e-mails uniques, "
+              f"{len(domaines)} domaines pros, {len(noms)} noms d'établissements")
+    return {"emails": emails, "domaines": domaines, "noms": noms}
+
+
+def motif_rejet(email, nom, ln):
+    """Renvoie la raison du rejet, ou None si l'adresse est acceptable."""
+    e = normaliser_email(email)
+    if not re.fullmatch(r"[a-z0-9._%+'-]+@[a-z0-9.-]+\.[a-z]{2,}", e):
+        return "format invalide"
+    if e in ln["emails"]:
+        return "doublon (déjà dans les 4 fichiers)"
+    for s in SOUS_CHAINES_INTERDITES:
+        if s in e:
+            return f"sous-chaîne interdite « {s} »"
+    local, dom = e.split("@", 1)
+    if local.startswith(LOCAUX_TECHNIQUES) or e.endswith(EXTENSIONS_FICHIERS):
+        return "adresse technique"
+    if any(h in dom for h in HOTES_AGENCES):
+        return "adresse d'hébergeur ou d'annuaire"
+    reseau = est_reseau(dom) or est_reseau(nom)
+    if dom in ln["domaines"] and not reseau:
+        return "établissement déjà connu (même domaine)"
+    if nom and cle_nom(nom) in ln["noms"] and not reseau:
+        return "établissement déjà connu (même nom)"
+    return None
+
+
+# --------------------------------------------------------------------------
+# 2. Colonne Prenom
+# --------------------------------------------------------------------------
+PETITS_MOTS = {"de", "du", "des", "la", "le", "les", "et", "à", "a", "aux", "au", "en", "sur",
+               "d'", "l'"}
+GENRE = {  # nom commun en tête -> article contracté
+    "de la": ["cave", "fromagerie", "maison", "table", "cremerie", "brasserie", "boutique",
+              "cabane", "ferme", "halle", "taverne", "grange", "terrasse", "brulerie", "cuisine",
+              "boite", "cantine", "guinguette", "petite", "belle", "villa", "coop", "cooperative",
+              "torrefaction", "marmite", "fabrique", "bouteille", "vigne", "source", "bergerie"],
+    "du": ["comptoir", "bistrot", "bistro", "restaurant", "cellier", "bar", "domaine", "marche",
+           "moulin", "relais", "chai", "cafe", "petit", "grand", "jardin", "garde-manger",
+           "panier", "caveau", "traiteur", "manoir", "chateau", "local", "zinc", "pub", "clos",
+           "coin", "quai", "vieux", "resto", "salon", "fournil", "p'tit", "ptit"],
+    "des": ["caves", "chais", "saveurs", "delices", "halles", "jardins", "terroirs", "vins",
+            "gourmandises", "fromages", "celliers", "comptoirs", "tables", "copains", "bocaux"],
+    "de l'": ["epicerie", "auberge", "hotel", "atelier", "estaminet", "echoppe", "entrepot",
+              "ecurie", "herboristerie", "amphore", "ardoise", "escale", "etable", "annexe",
+              "oustal", "instant", "ile", "orangerie", "abri"],
+}
+RE_FORME_JURIDIQUE = re.compile(r"\b(SARL|SAS|SASU|EURL|SA|SNC|SCEA|EARL|GAEC)\b\.?", re.I)
+VOYELLES = "aeiouyhàâäéèêëîïôöùûüAEIOUYHÀÂÄÉÈÊËÎÏÔÖÙÛÜ"
+
+
+def casse_propre(nom):
+    """Remet en casse normale un nom tout en majuscules ou tout en minuscules."""
+    if nom != nom.upper() and nom != nom.lower():
+        return nom
+    mots = []
+    for i, m in enumerate(nom.lower().split()):
+        if i > 0 and m in PETITS_MOTS:
+            mots.append(m)
+        elif "'" in m:
+            a, b = m.split("'", 1)
+            mots.append(a + "'" + b[:1].upper() + b[1:] if a in ("l", "d") and i > 0
+                        else a[:1].upper() + a[1:] + "'" + b[:1].upper() + b[1:])
+        else:
+            mots.append("-".join(p[:1].upper() + p[1:] for p in m.split("-")))
+    return " ".join(mots)
+
+
+def formule_equipe(nom):
+    """Construit « à toute l'équipe de la/du/des/de l'/de X » à partir d'un nom brut."""
+    n = RE_FORME_JURIDIQUE.sub("", nom or "").strip(" -–,.")
+    n = re.sub(r"\s+", " ", n)
+    if not n or len(n) > 60 or len(n) < 2 or re.search(r"[@/|]|http", n):
+        return "à toute l'équipe"
+    n = casse_propre(n)
+    bas = n.lower()
+    if bas.startswith("la "):
+        return f"à toute l'équipe de la {n[3:]}"
+    if bas.startswith("le "):
+        return f"à toute l'équipe du {n[3:]}"
+    if bas.startswith("les "):
+        return f"à toute l'équipe des {n[4:]}"
+    if bas.startswith(("l'", "l’")):
+        reste = n[2:]
+        return f"à toute l'équipe de l'{reste[:1].upper()}{reste[1:]}"
+    premier = sans_accents(bas.split()[0]).strip("'’")
+    for article, mots in GENRE.items():
+        if premier in mots:
+            return f"à toute l'équipe {article}{'' if article.endswith(chr(39)) else ' '}{n}"
+    if n[0] in VOYELLES and not n.lower().startswith(("hu", "ha", "he", "ho", "hi")):
+        return f"à toute l'équipe d'{n}"
+    return f"à toute l'équipe de {n}"
+
+
+PRENOMS_FR = set("""
+adele adrien agathe agnes alain alexandra alexandre alexis alice aline amandine amelie anais andre
+angelique anne annick anthony antoine arnaud aude audrey aurelie aurelien axel baptiste benedicte
+benjamin benoit bernard bertrand brigitte bruno camille carole caroline catherine cecile cedric celine
+chantal charles charlotte christelle christian christine christophe claire clara claude clement
+clemence corinne coralie cyril damien daniel david delphine denis didier dominique edouard elise
+elodie emilie emeline emma emmanuel emmanuelle eric estelle etienne fabien fabienne fabrice fanny
+florence florent florian francis franck francois francoise frederic gael gaelle gaetan gerard
+gilles gregory guillaume guy helene herve hugo isabelle jacques jean jeanne jeremie jeremy jerome
+joel johanna jonathan joseph julie julien juliette justine karine kevin laetitia laure laurence
+laurent lea leo loic lucas lucie ludovic magali manon marc marie marine marion martine mathieu
+mathilde matthieu maxime melanie michael michel mickael mylene nadine nathalie nicolas noemie olivier
+pascal pascale patrice patricia patrick paul pauline philippe pierre quentin raphael regis remi
+renaud richard robert romain sabrina sandrine sarah sebastien serge severine simon solene sophie
+stephane stephanie sylvain sylvie thibault thierry thomas valentin valerie vanessa veronique
+victor vincent virginie xavier yann yannick yves yvan zoe
+""".split())
+
+
+def joli_prenom(p):
+    return "-".join(x[:1].upper() + x[1:].lower() for x in p.split("-"))
+
+
+def trouver_prenom(texte_mentions, email):
+    """Prénom du gérant si on le trouve de façon fiable, sinon None."""
+    if texte_mentions:
+        m = re.search(r"(?i:directeur|directrice|responsable)\s+(?i:de)\s+(?i:la\s+)?(?i:publication)\s*:?\s*"
+                      r"(?:M\.|Mme|Madame|Monsieur)?\s*([A-ZÉÈÂ][a-zéèêëàâîïôûüç]+(?:-[A-ZÉ][a-zéèêëç]+)?)\s+"
+                      r"[A-ZÉ][A-Za-zÉéèêëàâîïôûüç-]+", texte_mentions)
+        if m and sans_accents(m.group(1).lower()) in PRENOMS_FR:
+            return joli_prenom(m.group(1))
+        m = re.search(r"(?i:gérante|gérant|fondatrice|fondateur|sommelière|sommelier)\s*:?\s*"
+                      r"([A-ZÉ][a-zéèêëàâîïôûüç]+)\s+[A-ZÉ][A-Za-zé-]+", texte_mentions)
+        if m and sans_accents(m.group(1).lower()) in PRENOMS_FR:
+            return joli_prenom(m.group(1))
+    local = email.split("@")[0]
+    tete = re.split(r"[._-]", local)[0]
+    if "." in local or "_" in local or "-" in local:
+        if sans_accents(tete.lower()) in PRENOMS_FR:
+            return joli_prenom(tete)
+    return None
+
+
+def test_prenoms():
+    cas = {
+        "La Cave Sablaise": "à toute l'équipe de la Cave Sablaise",
+        "Le Petit Tonneau": "à toute l'équipe du Petit Tonneau",
+        "Les Caves du Granit Bleu": "à toute l'équipe des Caves du Granit Bleu",
+        "L'Octave": "à toute l'équipe de l'Octave",
+        "Chez Milo": "à toute l'équipe de Chez Milo",
+        "Au Gourmet Vendéen": "à toute l'équipe d'Au Gourmet Vendéen",
+        "Fromagerie Beillevaire": "à toute l'équipe de la Fromagerie Beillevaire",
+        "Comptoir de la Bière": "à toute l'équipe du Comptoir de la Bière",
+        "Épicerie Racynes": "à toute l'équipe de l'Épicerie Racynes",
+        "Biocoop Les Herbiers": "à toute l'équipe de Biocoop Les Herbiers",
+        "CAVE SABLAISE SARL": "à toute l'équipe de la Cave Sablaise",
+        "Caves du Trégor": "à toute l'équipe des Caves du Trégor",
+        "Auberge de Poupet": "à toute l'équipe de l'Auberge de Poupet",
+        "Brasserie des Halles": "à toute l'équipe de la Brasserie des Halles",
+        "EPICERIE DES MAINES": "à toute l'équipe de l'Epicerie des Maines",
+        "Vinochio": "à toute l'équipe de Vinochio",
+        "Une Bonne Bouteille": "à toute l'équipe d'Une Bonne Bouteille",
+        "": "à toute l'équipe",
+    }
+    ok = 0
+    for nom, attendu in cas.items():
+        obtenu = formule_equipe(nom)
+        statut = "OK " if obtenu == attendu else "KO "
+        ok += obtenu == attendu
+        print(f"  {statut} {nom!r:32s} -> {obtenu}" + ("" if obtenu == attendu else f"   (attendu : {attendu})"))
+    for mentions, email, attendu in [
+        ("Directeur de la publication : Julien Moreau", "contact@x.fr", "Julien"),
+        ("", "sophie.martin@gmail.com", "Sophie"),
+        ("", "cave.indigenes@gmail.com", None),
+        ("Gérante : Hélène Durand", "info@y.fr", "Hélène"),
+    ]:
+        obtenu = trouver_prenom(mentions, email)
+        ok += obtenu == attendu
+        print(f"  {'OK ' if obtenu == attendu else 'KO '} prénom({email}) -> {obtenu}")
+    total = len(cas) + 4
+    print(f"  {ok}/{total} tests réussis")
+    return ok == total
+
+
+# --------------------------------------------------------------------------
+# 3. Accès web poli (cache, robots.txt, pause par site)
+# --------------------------------------------------------------------------
+class Navigateur:
+    def __init__(self):
+        import requests
+        self.s = requests.Session()
+        self.s.headers.update({"User-Agent": USER_AGENT, "Accept-Language": "fr-FR,fr;q=0.9"})
+        self.dernier = {}
+        self.robots = {}
+        self.bloques = {}
+        os.makedirs(DOSSIER_CACHE, exist_ok=True)
+
+    def _autorise(self, url):
+        hote = urlparse(url).scheme + "://" + urlparse(url).netloc
+        if hote not in self.robots:
+            rp = urllib.robotparser.RobotFileParser()
+            try:
+                r = self.s.get(hote + "/robots.txt", timeout=10)
+                rp.parse(r.text.splitlines() if r.status_code == 200 else [])
+            except Exception:
+                rp.parse([])
+            self.robots[hote] = rp
+        return self.robots[hote].can_fetch(USER_AGENT, url)
+
+    def get(self, url):
+        cache = os.path.join(DOSSIER_CACHE, hashlib.sha1(url.encode()).hexdigest() + ".html")
+        if os.path.exists(cache):
+            return open(cache, encoding="utf-8", errors="ignore").read()
+        hote = urlparse(url).netloc
+        if not self._autorise(url):
+            return None
+        attente = PAUSE_PAR_SITE - (time.time() - self.dernier.get(hote, 0))
+        if attente > 0:
+            time.sleep(attente)
+        try:
+            r = self.s.get(url, timeout=15)
+        except Exception as ex:
+            self.bloques[hote] = str(ex)[:80]
+            return None
+        finally:
+            self.dernier[hote] = time.time()
+        if r.status_code in (403, 429, 503):
+            self.bloques[hote] = f"HTTP {r.status_code}"
+            return None
+        if r.status_code != 200 or "html" not in r.headers.get("content-type", "html"):
+            return None
+        r.encoding = r.encoding or r.apparent_encoding
+        open(cache, "w", encoding="utf-8").write(r.text)
+        return r.text
+
+    def a_un_mx(self, dom):
+        if dom in WEBMAILS:
+            return True
+        cle = os.path.join(DOSSIER_CACHE, "mx_" + dom)
+        if os.path.exists(cle):
+            return open(cle).read() == "1"
+        try:
+            j = self.s.get(f"https://dns.google/resolve?name={dom}&type=MX", timeout=10).json()
+            ok = any(a.get("type") == 15 for a in j.get("Answer", []))
+        except Exception:
+            return True  # DNS indisponible : on ne rejette pas sur ce seul critère
+        open(cle, "w").write("1" if ok else "0")
+        return ok
+
+
+# --------------------------------------------------------------------------
+# 4. Extraction des e-mails d'un site
+# --------------------------------------------------------------------------
+RE_EMAIL = re.compile(r"[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+PAGES_CONTACT = ("contact", "nous-contacter", "mentions", "legal", "qui-sommes", "a-propos",
+                 "apropos", "about", "equipe", "infos-pratiques", "acces")
+
+
+def texte_et_liens(html, base):
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    mailtos = [a["href"] for a in soup.select("a[href^='mailto:']")]
+    liens = [urljoin(base, a["href"]) for a in soup.select("a[href]")]
+    for t in soup(["script", "style", "noscript"]):
+        t.decompose()
+    titre = soup.title.get_text(" ", strip=True) if soup.title else ""
+    return soup.get_text(" ", strip=True), mailtos, liens, titre
+
+
+def desobfusquer(texte):
+    t = re.sub(r"\s*[\[\(\{]\s*(?:at|arobase|@)\s*[\]\)\}]\s*", "@", texte, flags=re.I)
+    t = re.sub(r"\s*[\[\(\{]\s*(?:dot|point)\s*[\]\)\}]\s*", ".", t, flags=re.I)
+    return t
+
+
+def explorer_site(nav, url):
+    """Visite l'accueil et les pages contact/mentions ; renvoie emails (avec URL source) et textes."""
+    accueil = nav.get(url)
+    if not accueil:
+        return None
+    hote = urlparse(url).netloc.replace("www.", "")
+    pages = [(url, accueil)]
+    _, _, liens, titre = texte_et_liens(accueil, url)
+    vus = {url}
+    for l in liens:
+        if urlparse(l).netloc.replace("www.", "") == hote and l not in vus \
+                and any(k in l.lower() for k in PAGES_CONTACT) and len(pages) < 6:
+            vus.add(l)
+            h = nav.get(l)
+            if h:
+                pages.append((l, h))
+    trouves, textes, mentions = {}, [], ""
+    for u, h in pages:
+        texte, mailtos, _, _ = texte_et_liens(h, u)
+        textes.append(texte)
+        if any(k in u.lower() for k in ("mentions", "legal", "qui-sommes", "a-propos", "about")):
+            mentions += " " + texte
+        for e in [normaliser_email(m) for m in mailtos] + \
+                 [normaliser_email(m) for m in RE_EMAIL.findall(desobfusquer(texte))]:
+            if e and e not in trouves:
+                trouves[e] = u
+    return {"emails": trouves, "texte": " ".join(textes), "mentions": mentions,
+            "titre": titre, "hote": hote}
+
+
+# --------------------------------------------------------------------------
+# 5. Qualification
+# --------------------------------------------------------------------------
+def qualifier(texte, titre):
+    """(catégorie, raison_rejet). Catégorie None si le lieu ne parle pas de vin/bouche."""
+    t = (titre + " " + texte).lower()
+    tt = (titre or "").lower()
+    for m in MOTS_INTERDITS:
+        if m in tt or t.count(m) >= 3:
+            return None, f"hors cible (« {m} »)"
+    scores = {cat: sum(t.count(m) for m in mots) for cat, mots in MOTS_METIER.items()}
+    cat, score = max(scores.items(), key=lambda x: x[1])
+    if score < 2:
+        return None, "activité non liée au vin"
+    if cat == "Restaurant" and not any(w in t for w in ("vin", "cave", "sommelier", "accord")):
+        return None, "restaurant sans vin mis en avant"
+    return cat, None
+
+
+def localiser(texte, ville_hint=None):
+    """Trouve un code postal de la zone dans la page ; renvoie (ville, cp, distance)."""
+    cps = re.findall(r"\b(44|49|56|85)\s?(\d{3})\b", texte)
+    table = {v[1]: v for v in VILLES}
+    for a, b in cps:
+        cp = a + b
+        if cp in table:
+            v = table[cp]
+            return v[0], cp, distance_km(PONT_SAINT_MARTIN, (v[2], v[3]))
+    if cps:
+        cp = cps[0][0] + cps[0][1]
+        return ville_hint or "", cp, None
+    if ville_hint:
+        for v in VILLES:
+            if v[0] == ville_hint:
+                return v[0], v[1], distance_km(PONT_SAINT_MARTIN, (v[2], v[3]))
+    return None, None, None
+
+
+def distance_par_cp(nav, cp):
+    cle = os.path.join(DOSSIER_CACHE, "geo_" + cp)
+    if os.path.exists(cle):
+        d = json.load(open(cle))
+    else:
+        try:
+            d = nav.s.get(f"https://geo.api.gouv.fr/communes?codePostal={cp}&fields=nom,centre",
+                          timeout=10).json()
+        except Exception:
+            return None, None
+        json.dump(d, open(cle, "w"))
+    if not d:
+        return None, None
+    lon, lat = d[0]["centre"]["coordinates"]
+    return d[0]["nom"], distance_km(PONT_SAINT_MARTIN, (lat, lon))
+
+
+# --------------------------------------------------------------------------
+# 6. Découverte des sites à visiter
+# --------------------------------------------------------------------------
+def candidats_fichier():
+    if not os.path.exists(CANDIDATS):
+        return []
+    return [dict(r, source="liste manuelle") for r in csv.DictReader(open(CANDIDATS, encoding="utf-8"))]
+
+
+def candidats_petit_fute(nav, max_pages=60):
+    """Parcourt les rubriques gourmandes du Petit Futé et récupère les liens vers les sites."""
+    sortie, a_voir, vus = [], [], set()
+    for dep, url in PETIT_FUTE_DEPARTEMENTS.items():
+        a_voir.append((url, 0, dep))
+    while a_voir and len(vus) < max_pages:
+        url, prof, dep = a_voir.pop(0)
+        if url in vus:
+            continue
+        vus.add(url)
+        html = nav.get(url)
+        if not html:
+            continue
+        texte, _, liens, titre = texte_et_liens(html, url)
+        for l in liens:
+            p = urlparse(l)
+            if "petitfute" in p.netloc:
+                if prof < 3 and any(k in l.lower() for k in MOTS_RUBRIQUES_PF) and l not in vus:
+                    a_voir.append((l.split("#")[0], prof + 1, dep))
+            elif p.scheme.startswith("http") and not any(h in p.netloc for h in HOTES_AGENCES):
+                sortie.append({"nom": "", "ville": "", "url": f"{p.scheme}://{p.netloc}/",
+                               "categorie": "", "source": url})
+    bloque = [h for h in nav.bloques if "petitfute" in h]
+    if bloque:
+        print(f"  ⚠ Petit Futé refuse le robot : {nav.bloques[bloque[0]]}")
+    return sortie
+
+
+def candidats_recherche(nav, villes, profils, max_requetes=200):
+    sortie, n = [], 0
+    for v in villes:
+        for p in profils:
+            if n >= max_requetes:
+                return sortie
+            n += 1
+            q = f"{p} {v[0]} {v[1]}"
+            html = nav.get("https://html.duckduckgo.com/html/?q=" + quote_plus(q))
+            if not html:
+                if "html.duckduckgo.com" in nav.bloques:
+                    print(f"  ⚠ Le moteur de recherche bloque le robot : {nav.bloques['html.duckduckgo.com']}")
+                    return sortie
+                continue
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, "html.parser")
+            for a in soup.select("a.result__a"):
+                href = a.get("href", "")
+                m = re.search(r"uddg=([^&]+)", href)
+                if m:
+                    from urllib.parse import unquote
+                    href = unquote(m.group(1))
+                pu = urlparse(href)
+                if pu.scheme.startswith("http") and not any(h in pu.netloc for h in HOTES_AGENCES + (
+                        "tripadvisor", "thefork", "lafourchette", "mappy", "yelp", "wikipedia",
+                        "bottin", "societe.com", "pappers", "ouest-france", "linternaute")):
+                    sortie.append({"nom": a.get_text(" ", strip=True), "ville": v[0],
+                                   "url": f"{pu.scheme}://{pu.netloc}/", "categorie": p,
+                                   "source": "recherche : " + q})
+    return sortie
+
+
+def nom_depuis_titre(titre, hote):
+    t = re.split(r"\s[|\-–—:•]\s", titre or "")[0].strip()
+    if 2 <= len(t) <= 50 and not re.search(r"accueil|home|bienvenue|site officiel", t, re.I):
+        return t
+    base = hote.split(".")[0].replace("-", " ")
+    return base
+
+
+# --------------------------------------------------------------------------
+# 7. Collecte principale
+# --------------------------------------------------------------------------
+def collecter(maximum, sources):
+    ln = charger_liste_noire()
+    nav = Navigateur()
+    candidats = candidats_fichier()
+    if "petitfute" in sources:
+        print("→ Petit Futé…")
+        candidats += candidats_petit_fute(nav)
+    if "recherche" in sources:
+        print("→ Moteur de recherche…")
+        candidats += candidats_recherche(nav, VILLES, PROFILS_RECHERCHE)
+    print(f"  {len(candidats)} sites candidats")
+
+    retenus, details, journal, sites_vus = {}, [], [], set()
+    for c in candidats:
+        if len(retenus) >= maximum:
+            break
+        hote = urlparse(c["url"]).netloc.replace("www.", "")
+        if not hote or hote in sites_vus:
+            continue
+        sites_vus.add(hote)
+        if hote in ln["domaines"] and not est_reseau(hote):
+            journal.append((c["url"], "", "site déjà connu"))
+            continue
+        info = explorer_site(nav, c["url"])
+        if not info or not info["emails"]:
+            journal.append((c["url"], "", "aucun e-mail public"))
+            continue
+        cat, raison = qualifier(info["texte"], info["titre"])
+        if not cat:
+            journal.append((c["url"], "", raison))
+            continue
+        ville, cp, dist = localiser(info["texte"], c.get("ville"))
+        if cp and dist is None:
+            ville, dist = distance_par_cp(nav, cp)
+        if dist is None or dist > RAYON_KM:
+            journal.append((c["url"], "", f"hors zone ({cp or '?'})"))
+            continue
+        nom = c.get("nom") or nom_depuis_titre(info["titre"], hote)
+        # Un seul e-mail par établissement : on préfère celui du domaine du site.
+        emails = sorted(info["emails"].items(),
+                        key=lambda kv: (domaine(kv[0]) != hote, not kv[0].startswith(("contact", "info", "bonjour"))))
+        for email, url_source in emails:
+            dom = domaine(email)
+            if dom != hote and dom not in WEBMAILS:
+                journal.append((c["url"], email, "domaine étranger au site"))
+                continue
+            r = motif_rejet(email, nom, ln)
+            if r:
+                journal.append((c["url"], email, r))
+                if r.startswith("établissement"):
+                    break
+                continue
+            if email in retenus:
+                continue
+            if not nav.a_un_mx(dom):
+                journal.append((c["url"], email, "domaine sans serveur mail"))
+                continue
+            prenom = trouver_prenom(info["mentions"], email) or formule_equipe(nom)
+            retenus[email] = prenom
+            ln["noms"].add(cle_nom(nom))
+            if dom not in WEBMAILS:
+                ln["domaines"].add(dom)
+            details.append({"Email": email, "Prenom": prenom, "Etablissement": nom, "Ville": ville or "",
+                            "CP": cp or "", "Distance_km": round(dist), "Categorie": cat,
+                            "URL_preuve": url_source, "Source": c.get("source", ""),
+                            "Date": time.strftime("%Y-%m-%d")})
+            print(f"  ✔ {len(retenus):3d}  {email:42s} {prenom[:45]:45s} {ville} ({cat})")
+            break
+
+    ecrire(retenus, details)
+    with open(os.path.join(DOSSIER_CACHE, "journal_rejets.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["url", "email", "raison"])
+        w.writerows(journal)
+    if nav.bloques:
+        print("  Sites qui ont refusé le robot :", ", ".join(f"{h} ({r})" for h, r in list(nav.bloques.items())[:15]))
+    print(f"→ {len(retenus)} contacts retenus, {len(journal)} rejets (cache/journal_rejets.csv)")
+
+
+def ecrire(retenus, details):
+    with open(SORTIE, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f, lineterminator="\n")
+        w.writerow(["Email", "Prenom"])
+        for e, p in retenus.items():
+            w.writerow([e, p])
+    if details:
+        with open(SORTIE_DETAILS, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(details[0].keys()), lineterminator="\n")
+            w.writeheader()
+            w.writerows(details)
+
+
+# --------------------------------------------------------------------------
+# 8. Contrôle indépendant du livrable
+# --------------------------------------------------------------------------
+def verifier():
+    ln = charger_liste_noire(verbeux=False)
+    lignes = list(csv.reader(open(SORTIE, encoding="utf-8")))
+    erreurs = []
+    if lignes[0] != ["Email", "Prenom"]:
+        erreurs.append(f"en-tête incorrect : {lignes[0]}")
+    vus = set()
+    for i, l in enumerate(lignes[1:], start=2):
+        if len(l) != 2:
+            erreurs.append(f"ligne {i} : {len(l)} colonnes")
+            continue
+        e, p = l
+        if e != normaliser_email(e):
+            erreurs.append(f"ligne {i} : e-mail non normalisé {e}")
+        if e in vus:
+            erreurs.append(f"ligne {i} : doublon interne {e}")
+        vus.add(e)
+        if e in ln["emails"]:
+            erreurs.append(f"ligne {i} : COLLISION liste noire {e}")
+        if any(s in e for s in SOUS_CHAINES_INTERDITES):
+            erreurs.append(f"ligne {i} : sous-chaîne interdite {e}")
+        if not re.fullmatch(r"[a-z0-9._%+'-]+@[a-z0-9.-]+\.[a-z]{2,}", e):
+            erreurs.append(f"ligne {i} : format {e}")
+        if domaine(e) in ln["domaines"] and not est_reseau(domaine(e)):
+            erreurs.append(f"ligne {i} : domaine déjà connu {e}")
+        if not (p.startswith("à toute l'équipe") or re.fullmatch(r"[A-ZÉÈ][a-zéèêëïîôç]+(-[A-ZÉ][a-zéèêëç]+)?", p)):
+            erreurs.append(f"ligne {i} : Prenom mal formé « {p} »")
+    print(f"  {len(lignes) - 1} contacts contrôlés, {len(erreurs)} anomalie(s)")
+    for e in erreurs:
+        print("   ✘", e)
+    if os.path.exists(SORTIE_DETAILS):
+        det = list(csv.DictReader(open(SORTIE_DETAILS, encoding="utf-8")))
+        sans_preuve = vus - {d["Email"] for d in det if d.get("URL_preuve")}
+        print(f"  preuves : {len(vus) - len(sans_preuve)}/{len(vus)} contacts ont une URL source")
+        for d in random.sample(det, min(10, len(det))):
+            print(f"   · {d['Email']:40s} ← {d['URL_preuve']}")
+    return not erreurs
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("etape", choices=["liste-noire", "test-prenoms", "collecter", "verifier"])
+    ap.add_argument("--max", type=int, default=100)
+    ap.add_argument("--sources", default="fichier,petitfute,recherche",
+                    help="sources à utiliser, séparées par des virgules")
+    a = ap.parse_args()
+    if a.etape == "liste-noire":
+        charger_liste_noire()
+    elif a.etape == "test-prenoms":
+        sys.exit(0 if test_prenoms() else 1)
+    elif a.etape == "collecter":
+        collecter(a.max, a.sources.split(","))
+    else:
+        sys.exit(0 if verifier() else 1)
+
+
+if __name__ == "__main__":
+    main()
