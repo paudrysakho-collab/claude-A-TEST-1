@@ -23,9 +23,10 @@ import random
 import re
 import sys
 import time
+import html as html_lib
 import unicodedata
 import urllib.robotparser
-from urllib.parse import urljoin, urlparse, quote_plus
+from urllib.parse import urljoin, urlparse, quote_plus, unquote
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 DOSSIER_SOURCES = os.path.join(ICI, "donnees_sources")
@@ -180,6 +181,24 @@ VILLES = [
     ("Port-Saint-Père", "44710", 47.1320, -1.7490, "44"),
     ("Préfailles", "44770", 47.1330, -2.2170, "44"),
     ("Billiers", "56190", 47.5330, -2.4830, "56"),
+    ("Orvault", "44700", 47.2710, -1.6220, "44"),
+    ("Saint-Herblain", "44800", 47.2120, -1.6490, "44"),
+    ("Rezé", "44400", 47.1830, -1.5500, "44"),
+    ("Bouguenais", "44340", 47.1780, -1.6240, "44"),
+    ("Saint-Sébastien-sur-Loire", "44230", 47.2080, -1.5020, "44"),
+    ("Carquefou", "44470", 47.2970, -1.4920, "44"),
+    ("Thouaré-sur-Loire", "44470", 47.2670, -1.4390, "44"),
+    ("Sainte-Luce-sur-Loire", "44980", 47.2500, -1.4850, "44"),
+    ("Couëron", "44220", 47.2150, -1.7280, "44"),
+    ("Sautron", "44880", 47.2630, -1.6700, "44"),
+    ("Longeville-sur-Mer", "85560", 46.4170, -1.5080, "85"),
+    ("Le May-sur-Èvre", "49122", 47.1340, -0.8930, "49"),
+    ("La Chapelle-sur-Erdre", "44240", 47.2990, -1.5520, "44"),
+    ("Sucé-sur-Erdre", "44240", 47.3430, -1.5310, "44"),
+    ("Saint-Gildas-des-Bois", "44530", 47.5170, -2.0390, "44"),
+    ("Missillac", "44780", 47.4830, -2.1590, "44"),
+    ("Saint-Fulgent", "85250", 46.8530, -1.1780, "85"),
+    ("Mouilleron-le-Captif", "85000", 46.7150, -1.4560, "85"),
     ("Jard-sur-Mer", "85520", 46.4140, -1.5750, "85"),
     ("La Tranche-sur-Mer", "85360", 46.3440, -1.4390, "85"),
     ("Brétignolles-sur-Mer", "85470", 46.6320, -1.8630, "85"),
@@ -295,7 +314,7 @@ def charger_liste_noire(verbeux=True):
     }
     for chemin in EXCLURE_EN_PLUS:
         lignes = list(csv.DictReader(open(chemin, encoding="utf-8-sig")))
-        par_source[os.path.basename(chemin)[:9]] = {normaliser_email(r.get("Email")) for r in lignes}
+        par_source[os.path.basename(chemin)] = {normaliser_email(r.get("Email")) for r in lignes}
         fusion = fusion + lignes  # leurs formules « à toute l'équipe de X » alimentent aussi les noms connus
     noms_livres = set()
     for chemin in EXCLURE_EN_PLUS:
@@ -339,7 +358,7 @@ def motif_rejet(email, nom, ln):
         return "format invalide"
     if e in ln["emails"]:
         return "doublon (déjà dans les 4 fichiers)"
-    if any(x in e for x in EXCLUSIONS_VALIDEES):
+    if any(x in e for x in EXCLUSIONS_VALIDEES) or "+" in e.split("@")[0]:
         return "exclu après validation (chaîne, snack, cuisine étrangère)"
     for s in SOUS_CHAINES_INTERDITES:
         if s in e:
@@ -354,9 +373,11 @@ def motif_rejet(email, nom, ln):
         return "établissement déjà connu (même domaine)"
     if local in ln.get("locaux", ()) and not reseau:
         return "établissement déjà connu (même adresse, autre fournisseur)"
+    racines_webmail = {w.rsplit(".", 1)[0] for w in WEBMAILS}
     if "racines" not in ln:
-        ln["racines"] = {d.rsplit(".", 1)[0] for d in ln["domaines"]}
-    if dom.rsplit(".", 1)[0] in ln["racines"] and not reseau:
+        ln["racines"] = {d.rsplit(".", 1)[0] for d in ln["domaines"]} - racines_webmail
+    if dom not in WEBMAILS and dom.rsplit(".", 1)[0] not in racines_webmail \
+            and dom.rsplit(".", 1)[0] in ln["racines"] and not reseau:
         return "établissement déjà connu (même nom de domaine, autre extension)"
     if nom and cle_nom(nom) in ln["noms"] and not reseau:
         return "établissement déjà connu (même nom)"
@@ -407,18 +428,23 @@ def casse_propre(nom):
 
 def formule_equipe(nom):
     """Construit « à toute l'équipe de la/du/des/de l'/de X » à partir d'un nom brut."""
-    n = RE_FORME_JURIDIQUE.sub("", (nom or "").replace("’", "'")).strip(" -–,.")
+    n = (nom or "").replace("’", "'").replace("…", "")
+    n = re.sub(r"[\"«»“”]", "", n)
+    n = re.split(r"\s+[-–(]\s*|\s*\(", n)[0] if re.match(r"(?i)(?:bar|restaurant|h[oô]tel)\b", n) is None else re.sub(r"\s*\(.*$", "", n)
+    n = re.sub(r"(?i)^((?:bar|restaurant|h[oô]tel)(?:[ -]restaurant)?)\s+[-–]\s+", r"\1 ", n)
+    n = RE_FORME_JURIDIQUE.sub("", n).strip(" -–,.")
     n = re.sub(r"\s+", " ", n)
     if not n or len(n) > 60 or len(n) < 2 or re.search(r"[@/|]|http", n):
         return "à toute l'équipe"
     n = casse_propre(n)
     bas = n.lower()
+    maj = lambda x: x[:1].upper() + x[1:]
     if bas.startswith("la "):
-        return f"à toute l'équipe de la {n[3:]}"
+        return f"à toute l'équipe de la {maj(n[3:])}"
     if bas.startswith("le "):
-        return f"à toute l'équipe du {n[3:]}"
+        return f"à toute l'équipe du {maj(n[3:])}"
     if bas.startswith("les "):
-        return f"à toute l'équipe des {n[4:]}"
+        return f"à toute l'équipe des {maj(n[4:])}"
     if bas.startswith(("l'", "l’")):
         reste = n[2:]
         return f"à toute l'équipe de l'{reste[:1].upper()}{reste[1:]}"
@@ -580,7 +606,8 @@ class Navigateur:
         if r.status_code in (403, 429, 503):
             self.bloques[hote] = f"HTTP {r.status_code}"
             return None
-        if r.status_code != 200 or "html" not in r.headers.get("content-type", "html"):
+        ct = r.headers.get("content-type", "html")
+        if r.status_code != 200 or ("html" not in ct and "json" not in ct):
             open(echec, "w").write(str(r.status_code))
             return None
         r.encoding = r.encoding or r.apparent_encoding
@@ -864,13 +891,18 @@ RE_VT_FICHE = re.compile(r"https://www\.vendee-tourisme\.com/[a-z0-9-]+/[a-z0-9-
 RE_HORS_PROFIL = re.compile(r"pizz|cr[eê]p|galette|bl[ée] noir|cuisine du monde|sur le pouce|restauration rapide|"
                             r"kebab|burger|sushi|asiat|snack|food.?truck|glacier|friterie|tacos|chinois|japonais|"
                             r"indien|vietnam|tha[iï]|wok|royal|misay|nhu|ristorante|trattoria|vesuvio|ibla|"
-                            r"mie c[aâ]line|buffalo|fraiseraie|emportez|kyriad", re.I)
+                            r"mie c[aâ]line|buffalo|fraiseraie|emportez|kyriad|fish.?(?:&|and).?chips|maroc|sandwich|bagel|"
+                            r"cagliari|la boucherie|mookie", re.I)
 
 
 # Exclusions validées avec l'utilisateur (chaînes, snacks, cuisines étrangères) — 28/09/2026.
 EXCLUSIONS_VALIDEES = ("les3brasseurs.com", "pankeming@", "frenzi.fr", "redzone-challans.fr",
                        "snack-a-manu@", "la-boucherie.fr",
-                       "parthenay@")  # magasin du réseau situé à Parthenay (79), hors des 100 km
+                       "parthenay@",  # magasin du réseau situé à Parthenay (79), hors des 100 km
+                       # Lot 3 : chaînes, cuisines étrangères, sandwicheries, adresses d'agence web
+                       "laboucherie", "whykiki", "cantinedumaroc", "sandwich", "casadhernesto",
+                       "cagliari", "bagel", "proyecto", ".web@", "brasserie galu", "brasseriegalu",
+                       "latabledemaryann")  # déjà livrée au lot 1 sous contact@latabledemaryann.com
 
 
 def candidats_vendee_tourisme(nav, max_pages=40):
@@ -973,6 +1005,113 @@ def nom_depuis_titre(titre, hote):
     return base
 
 
+
+# Annuaires des commerces des sites de mairies (thème WordPress commun : /contacts/<fiche>/),
+# repérés à partir de l'annuaire officiel service-public (mairies_annuaires.json).
+RE_MAIRIE_CAT = re.compile(r"restaura|\bcaves?\b|\bvins?\b|caviste|[ée]picerie|alimentation|bouche|fromag|"
+                           r"cr[eè]mer|caf[ée]s?[ -]bars?|\bbars?\b|traiteur|gastronom|h[oô]tel", re.I)
+RE_MAIRIE_NOM = re.compile(r"\bcaves?\b|\bvins?\b|caviste|cellier|\bchais?\b|[ée]picerie|fromag|cr[eè]mer|torr[ée]f|"
+                           r"bistr|restaura|brasserie|auberge|traiteur|comptoir|saveur|gourm|terroir|\btable (?:d|de)\b|"
+                           r"h[oô]tel|biocoop|tapas|guinguette|\bbar\b", re.I)
+RE_MAIRIE_EXCLU = re.compile(r"boulang|p[âa]tiss|boucher|charcut|poissonn|primeur|superette|sup[eé]rette|"
+                             r"carrefour|intermarch|super u|leclerc|lidl|aldi|netto|spar\b|coccimarket|proxi|"
+                             r"tabac|pmu|presse|coiff|pharma|garage|[ée]cole|assoc|club|camping|g[iî]te|"
+                             r"chambre|mairie|salle|ehpad|cantine|restaurant scolaire|restauration scolaire|"
+                             r"foyer|centre|march[ée]\b|amap|ferme|gaec|earl|domaine|vignoble|ch[aâ]teau|tennis|sport|danse|"
+                             r"a[iï]kido|amicale|comit[ée]|souvenir|repair|incroyables|habitat|coll[èe]ge|lyc[ée]e|"
+                             r"du c(?:œ|oe)ur|r[ée]flexolog|secteur|solidari|social|municipal|fl[ée]chette|"
+                             r"p[oô]le|enfance|jeunesse|biblioth|m[ée]diath|paroisse|crèche|halte|accueil|h[oô]tel de ville|"
+                             r"f[ée]lin|animaux|pension|ibis|b&b|budget|r[ée]sidence|solidaire|couvreur|couture|"
+                             r"confr[ée]rie|jeux de r[oô]le|cadres|gamm|fournil|phimket|objets trouv", re.I)
+
+
+def categorie_mairie(texte):
+    t = texte.lower()
+    for motif, cat in ((r"torr[ée]f|caf[ée]s?\b.*(?:th[ée]|torr)", "Torréfacteur"),
+                       (r"fromag|cr[eè]mer", "Fromagerie"),
+                       (r"cave|caviste|cellier|vins?\b|chai\b", "Caviste"),
+                       (r"[ée]picerie|comptoir|saveur|gourm|terroir", "Épicerie fine"),
+                       (r"biocoop|\bbio\b", "Magasin bio"),
+                       (r"traiteur", "Traiteur"),
+                       (r"tapas|bar\b", "Bar à vins / tapas")):
+        if re.search(motif, t):
+            return cat
+    return "Restaurant"
+
+
+def candidats_mairies(nav):
+    try:
+        sites = json.load(open(os.path.join(ICI, "mairies_annuaires.json"), encoding="utf-8"))
+    except OSError:
+        print("  (mairies_annuaires.json absent : source mairie ignorée)")
+        return []
+    communes = {}
+    for nom, insee, base, total in sites:
+        communes.setdefault(base, nom.split(" - ", 1)[-1])
+    sortie = []
+    for base, commune in communes.items():
+        cats = {}
+        for page in range(1, 6):
+            try:
+                lot = json.loads(nav.get(f"{base}/wp-json/wp/v2/categories?per_page=100&page={page}") or "[]")
+            except ValueError:
+                break
+            if not isinstance(lot, list) or not lot:
+                break
+            cats.update({c["id"]: c.get("name", "") for c in lot if isinstance(c, dict)})
+            if len(lot) < 100:
+                break
+        bonnes = {i for i, n in cats.items() if RE_MAIRIE_CAT.search(html_lib.unescape(n))}
+        for page in range(1, 12):
+            try:
+                lot = json.loads(nav.get(f"{base}/wp-json/wp/v2/contacts?per_page=100&page={page}") or "[]")
+            except ValueError:
+                break
+            if not isinstance(lot, list) or not lot:
+                break
+            for c in lot:
+                if not isinstance(c, dict):
+                    continue
+                titre = html_lib.unescape(re.sub("<[^>]+>", "", c.get("title", {}).get("rendered", ""))).strip()
+                noms_cat = " ".join(cats.get(i, "") for i in c.get("categories", []))
+                if RE_MAIRIE_EXCLU.search(titre) or RE_HORS_PROFIL.search(titre):
+                    continue
+                if not RE_MAIRIE_NOM.search(titre):
+                    if not set(c.get("categories", [])) & bonnes or \
+                            re.search(r"(?i)\b(?:asso|club|les amis)|^[A-ZÉÈ' -]+ [A-Z][a-zéè]+$", titre):
+                        continue
+                sortie.append({"nom": titre, "ville": commune, "url": c.get("link", ""),
+                               "categorie": categorie_mairie(titre + " " + html_lib.unescape(noms_cat)),
+                               "fiche": "mairie", "source": "Annuaire mairie " + commune})
+            if len(lot) < 100:
+                break
+    sortie = [c for c in {c["url"]: c for c in sortie if c["url"]}.values()]
+    print(f"  Annuaires des mairies : {len(sortie)} fiches ({len(communes)} sites)")
+    return sortie
+
+
+def lire_fiche_mairie(html, hote):
+    """(emails, texte) du contenu principal d'une fiche contact de mairie."""
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    zone = soup.find("main") or soup.find("article") or soup
+    for bloc in zone.find_all(["header", "footer", "nav", "aside", "script", "style"]):
+        bloc.decompose()
+    emails = []
+    for a in zone.find_all("a", href=True):
+        h = a["href"]
+        if h.lower().startswith("mailto:") and not h[7:].startswith("?"):
+            e = normaliser_email(unquote(h[7:].split("?")[0]))
+            if e and domaine(e) != hote and e not in emails:
+                emails.append(e)
+    texte = zone.get_text(" ", strip=True)
+    for e in re.findall(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", texte):
+        e = normaliser_email(e)
+        if e and domaine(e) != hote and e not in emails:
+            emails.append(e)
+    return emails, texte
+
+
 # --------------------------------------------------------------------------
 # 7. Collecte principale
 # --------------------------------------------------------------------------
@@ -989,6 +1128,9 @@ def collecter(maximum, sources):
     if "ot" in sources:
         print("→ Offices de tourisme…")
         candidats += candidats_offices_tourisme(nav)
+    if "mairie" in sources:
+        print("→ Annuaires des mairies…")
+        candidats += candidats_mairies(nav)
     if "recherche" in sources:
         print("→ Moteur de recherche…")
         candidats += candidats_recherche(nav, VILLES, PROFILS_RECHERCHE)
@@ -1002,7 +1144,7 @@ def collecter(maximum, sources):
         dom = domaine(email)
         r = motif_rejet(email, nom, ln)
         hote_source = urlparse(c["url"]).netloc.replace("www.", "")
-        if not r and c.get("fiche") and dom != hote_source and dom.split(".")[0] in hote_source:
+        if not r and c.get("fiche") and (dom == hote_source or dom.split(".")[0] in hote_source):
             r = "adresse de l'annuaire lui-même"
         if not r and c.get("fiche") in ("ot", "tourinsoft") and RE_HORS_PROFIL.search(email):
             r = "hors profil d'après l'adresse (crêperie, pizzeria, chaîne…)"
@@ -1042,7 +1184,7 @@ def collecter(maximum, sources):
         if not hasattr(local, "nav"):
             local.nav = Navigateur()
         try:
-            if c.get("fiche") == "annuaire":
+            if c.get("fiche") in ("annuaire", "mairie"):
                 local.nav.get(c["url"])
             else:
                 explorer_site(local.nav, c["url"])
@@ -1093,6 +1235,34 @@ def collecter(maximum, sources):
                     journal.append((c["url"], email, f"hors zone ({cp or '?'})"))
                     continue
                 retenir(email, nom, ville, cp, dist, cat, c["url"], c)
+            continue
+        if c.get("fiche") == "mairie":
+            if c["url"] in sites_vus:
+                continue
+            sites_vus.add(c["url"])
+            html = nav.get(c["url"])
+            if not html:
+                journal.append((c["url"], "", "fiche inaccessible"))
+                continue
+            emails, texte = lire_fiche_mairie(html, urlparse(c["url"]).netloc.replace("www.", ""))
+            nom = c["nom"]
+            if not emails:
+                journal.append((c["url"], "", f"{nom} : pas d'e-mail sur la fiche"))
+                continue
+            if re.search("|".join(MOTS_INTERDITS), nom.lower()):
+                journal.append((c["url"], emails[0], f"{nom} : hors cible"))
+                continue
+            ville, cp, dist = localiser(texte, c.get("ville"))
+            if dist is None:
+                ville, dist = ville_connue(c.get("ville"), cp)
+            if dist is None and cp:
+                ville, dist = distance_par_cp(nav, cp)
+            if dist is None or dist > RAYON_KM:
+                journal.append((c["url"], emails[0], f"{nom} : hors zone ({cp or '?'})"))
+                continue
+            for email in emails:
+                if retenir(email, nom, ville, cp, dist, c["categorie"], c["url"], c):
+                    break
             continue
         if c.get("fiche") == "ot":
             if c["url"] in sites_vus:
@@ -1154,7 +1324,8 @@ def collecter(maximum, sources):
         if not hote or cle_site in sites_vus:
             continue
         sites_vus.add(cle_site)
-        if (hote in ln["domaines"] or hote.rsplit(".", 1)[0] in {d.rsplit(".", 1)[0] for d in ln["domaines"]}) \
+        if (hote in ln["domaines"] or hote.rsplit(".", 1)[0] in
+                {d.rsplit(".", 1)[0] for d in ln["domaines"]} - {w.rsplit(".", 1)[0] for w in WEBMAILS}) \
                 and not est_reseau(hote):
             journal.append((c["url"], "", "site déjà connu"))
             continue
