@@ -429,7 +429,7 @@ def casse_propre(nom):
 def formule_equipe(nom):
     """Construit « à toute l'équipe de la/du/des/de l'/de X » à partir d'un nom brut."""
     n = (nom or "").replace("’", "'").replace("…", "")
-    n = re.sub(r"[\"«»“”]", "", n)
+    n = re.sub(r"[\"«»“”!?]", "", n)
     n = re.split(r"\s+[-–(]\s*|\s*\(", n)[0] if re.match(r"(?i)(?:bar|restaurant|h[oô]tel)\b", n) is None else re.sub(r"\s*\(.*$", "", n)
     n = re.sub(r"(?i)^((?:bar|restaurant|h[oô]tel)(?:[ -]restaurant)?)\s+[-–]\s+", r"\1 ", n)
     n = RE_FORME_JURIDIQUE.sub("", n).strip(" -–,.")
@@ -607,7 +607,7 @@ class Navigateur:
             self.bloques[hote] = f"HTTP {r.status_code}"
             return None
         ct = r.headers.get("content-type", "html")
-        if r.status_code != 200 or ("html" not in ct and "json" not in ct):
+        if r.status_code != 200 or ("html" not in ct and "json" not in ct and "xml" not in ct):
             open(echec, "w").write(str(r.status_code))
             return None
         r.encoding = r.encoding or r.apparent_encoding
@@ -902,7 +902,11 @@ EXCLUSIONS_VALIDEES = ("les3brasseurs.com", "pankeming@", "frenzi.fr", "redzone-
                        # Lot 3 : chaînes, cuisines étrangères, sandwicheries, adresses d'agence web
                        "laboucherie", "whykiki", "cantinedumaroc", "sandwich", "casadhernesto",
                        "cagliari", "bagel", "proyecto", ".web@", "brasserie galu", "brasseriegalu",
-                       "latabledemaryann")  # déjà livrée au lot 1 sous contact@latabledemaryann.com
+                       "latabledemaryann",
+                       # Lot 4 : chaîne de pubs, pizzerias, vente à emporter, commerce automatique,
+                       # associations et activités sans lien avec le vin
+                       "aubureau.fr", "casacastello", "mauritalia", "mapopotebyanuphone", "ximiti",
+                       "amisdegourmalon", "bhglesmauges", "amelie.retailleau@")  # déjà livrée au lot 1 sous contact@latabledemaryann.com
 
 
 def candidats_vendee_tourisme(nav, max_pages=40):
@@ -935,6 +939,14 @@ OT_LISTES = [  # (page de liste, profil)
 ]
 
 
+OT_SITEMAPS = [  # (plan du site, [(motif d'URL, profil)])
+    ("https://www.ot-cholet.fr/sitemap.xml",
+     [(r"/restaurant/[^/]*(?:bar-a-vin|bistr)", "bar"), (r"/restaurant/", "restaurant"),
+      (r"/annuaire-pratique/[^/]*(?:cave|vin|epicer|fromag|torref|cafe|the-|biocoop|bio-|gourm|terroir|"
+       r"traiteur|comptoir|saveur|chocolat|halles|primeur|brasserie|bistr|restaurant)", "commerce")]),
+]
+
+
 def candidats_offices_tourisme(nav, max_pages=40):
     """Fiches des offices de tourisme dont les pages exposent l'e-mail en données schema.org."""
     sortie = []
@@ -950,8 +962,18 @@ def candidats_offices_tourisme(nav, max_pages=40):
             vues.update(nouvelles)
             sortie += [{"nom": "", "ville": "", "url": f, "categorie": profil, "fiche": "ot",
                         "source": "Office de tourisme " + urlparse(liste).netloc} for f in nouvelles]
+    # Offices de tourisme dont on lit le plan du site (sitemap.xml) : même format schema.org.
+    for plan, motifs in OT_SITEMAPS:
+        locs = re.findall(r"<loc>([^<]+)</loc>", nav.get(plan) or "")
+        for u in locs:
+            for motif, profil in motifs:
+                if re.search(motif, u) and not re.search(r"rapide|sandwich|cafeteria|pizz|cr[eê]p|kebab|burger|"
+                                                          r"sushi|asiat|chinois|indien|thai|outlet|italien|sicilien|cuisine-du-monde", u):
+                    sortie.append({"nom": "", "ville": "", "url": u, "categorie": profil, "fiche": "ot",
+                                   "source": "Office de tourisme " + urlparse(plan).netloc})
+                    break
     sortie = list({x["url"]: x for x in sortie}.values())
-    print(f"  Offices de tourisme (Pornic, Saint-Brevin) : {len(sortie)} fiches")
+    print(f"  Offices de tourisme (Pornic, Saint-Brevin, Cholet) : {len(sortie)} fiches")
     return sortie
 
 
@@ -1022,11 +1044,15 @@ RE_MAIRIE_EXCLU = re.compile(r"boulang|p[âa]tiss|boucher|charcut|poissonn|prime
                              r"du c(?:œ|oe)ur|r[ée]flexolog|secteur|solidari|social|municipal|fl[ée]chette|"
                              r"p[oô]le|enfance|jeunesse|biblioth|m[ée]diath|paroisse|crèche|halte|accueil|h[oô]tel de ville|"
                              r"f[ée]lin|animaux|pension|ibis|b&b|budget|r[ée]sidence|solidaire|couvreur|couture|"
-                             r"confr[ée]rie|jeux de r[oô]le|cadres|gamm|fournil|phimket|objets trouv", re.I)
+                             r"confr[ée]rie|jeux de r[oô]le|cadres|gamm|fournil|phimket|objets trouv|institut|d[ée]co\b|peinture|"
+                             r"intercommunalit|agglom[ée]ration|services\b|asie|microbrasserie|brasserie artisanale|"
+                             r"vente en ligne|location", re.I)
 
 
 def categorie_mairie(texte):
     t = texte.lower()
+    if re.search(r"restaura", t):
+        return "Restaurant"
     for motif, cat in ((r"torr[ée]f|caf[ée]s?\b.*(?:th[ée]|torr)", "Torréfacteur"),
                        (r"fromag|cr[eè]mer", "Fromagerie"),
                        (r"cave|caviste|cellier|vins?\b|chai\b", "Caviste"),
@@ -1046,25 +1072,28 @@ def candidats_mairies(nav):
         print("  (mairies_annuaires.json absent : source mairie ignorée)")
         return []
     communes = {}
-    for nom, insee, base, total in sites:
-        communes.setdefault(base, nom.split(" - ", 1)[-1])
+    for ligne in sites:
+        nom, insee, base = ligne[:3]
+        type_rest = ligne[4] if len(ligne) > 4 else "contacts"
+        communes.setdefault((base, type_rest), nom.split(" - ", 1)[-1])
     sortie = []
-    for base, commune in communes.items():
+    for (base, type_rest), commune in communes.items():
         cats = {}
-        for page in range(1, 6):
-            try:
-                lot = json.loads(nav.get(f"{base}/wp-json/wp/v2/categories?per_page=100&page={page}") or "[]")
-            except ValueError:
-                break
-            if not isinstance(lot, list) or not lot:
-                break
-            cats.update({c["id"]: c.get("name", "") for c in lot if isinstance(c, dict)})
-            if len(lot) < 100:
-                break
+        if type_rest == "contacts":  # thème où les rubriques (« Restaurants », « Caves »…) sont fiables
+            for page in range(1, 6):
+                try:
+                    lot = json.loads(nav.get(f"{base}/wp-json/wp/v2/categories?per_page=100&page={page}") or "[]")
+                except ValueError:
+                    break
+                if not isinstance(lot, list) or not lot:
+                    break
+                cats.update({c["id"]: c.get("name", "") for c in lot if isinstance(c, dict)})
+                if len(lot) < 100:
+                    break
         bonnes = {i for i, n in cats.items() if RE_MAIRIE_CAT.search(html_lib.unescape(n))}
         for page in range(1, 12):
             try:
-                lot = json.loads(nav.get(f"{base}/wp-json/wp/v2/contacts?per_page=100&page={page}") or "[]")
+                lot = json.loads(nav.get(f"{base}/wp-json/wp/v2/{type_rest}?per_page=100&page={page}") or "[]")
             except ValueError:
                 break
             if not isinstance(lot, list) or not lot:
@@ -1073,11 +1102,11 @@ def candidats_mairies(nav):
                 if not isinstance(c, dict):
                     continue
                 titre = html_lib.unescape(re.sub("<[^>]+>", "", c.get("title", {}).get("rendered", ""))).strip()
-                noms_cat = " ".join(cats.get(i, "") for i in c.get("categories", []))
+                noms_cat = " ".join(cats.get(i, "") for i in c.get("categories", []) if isinstance(i, int))
                 if RE_MAIRIE_EXCLU.search(titre) or RE_HORS_PROFIL.search(titre):
                     continue
                 if not RE_MAIRIE_NOM.search(titre):
-                    if not set(c.get("categories", [])) & bonnes or \
+                    if not set(i for i in c.get("categories", []) if isinstance(i, int)) & bonnes or \
                             re.search(r"(?i)\b(?:asso|club|les amis)|^[A-ZÉÈ' -]+ [A-Z][a-zéè]+$", titre):
                         continue
                 sortie.append({"nom": titre, "ville": commune, "url": c.get("link", ""),
@@ -1249,7 +1278,7 @@ def collecter(maximum, sources):
             if not emails:
                 journal.append((c["url"], "", f"{nom} : pas d'e-mail sur la fiche"))
                 continue
-            if re.search("|".join(MOTS_INTERDITS), nom.lower()):
+            if re.search("|".join(MOTS_INTERDITS), (nom + " " + texte[:3000]).lower()):
                 journal.append((c["url"], emails[0], f"{nom} : hors cible"))
                 continue
             ville, cp, dist = localiser(texte, c.get("ville"))

@@ -1,1 +1,1087 @@
-[["Mairie - Châteaubriant", "44036", "https://www.mairie-chateaubriant.fr", 506], ["Mairie - Trignac", "44210", "https://www.mairie-trignac.fr", 110], ["Mairie - Drefféac", "44053", "https://www.dreffeac.fr", 96], ["Mairie - Treffieux", "44208", "https://www.treffieux.fr", 105], ["Mairie - Abbaretz", "44001", "http://www.abbaretz.fr", 107], ["Mairie - Carquefou", "44026", "https://www.carquefou.fr", 456], ["Mairie - Puceul", "44138", "https://www.puceul.fr", 88], ["Mairie - Loireauxence", "44213", "https://www.loireauxence.fr", 212], ["Mairie - Nozay", "44113", "https://www.nozay44.fr", 302], ["Mairie - Cordemais", "44045", "https://www.cordemais.fr", 231], ["Mairie - Pontchâteau", "44129", "https://www.pontchateau.fr", 383], ["Mairie - Ligné", "44082", "https://www.ligne.fr", 368], ["Mairie - Vay", "44214", "http://www.vay.fr", 161], ["Mairie - Saffré", "44149", "https://www.saffre.fr", 214], ["Mairie - Guémené-Penfao", "44067", "https://www.mairie-guemene-penfao.fr", 289], ["Mairie déléguée - Maumusson", "44093", "https://www.vallonsdelerdre.fr", 403], ["Mairie déléguée - Freigné", "44225", "https://www.vallonsdelerdre.fr", 403], ["Mairie - Basse-Goulaine", "44009", "http://www.basse-goulaine.fr", 208], ["Mairie déléguée - Bonnoeuvre", "44017", "https://www.vallonsdelerdre.fr", 403], ["Mairie - La Grigonnais", "44224", "https://www.lagrigonnais.fr", 123], ["Mairie déléguée - Vritz", "44219", "https://www.vallonsdelerdre.fr", 403], ["Mairie - Vallons-de-l'Erdre", "44180", "https://www.vallonsdelerdre.fr", 403], ["Mairie - Sainte-Luce-sur-Loire", "44172", "https://www.sainte-luce-loire.com", 325], ["Mairie - Saint-Brevin-les-Pins", "44154", "https://www.saint-brevin.fr", 252], ["Mairie - Saint-Gildas-des-Bois", "44161", "http://www.saintgildasdesbois.fr", 172], ["Mairie - Les Moutiers-en-Retz", "44106", "https://www.mairie-lesmoutiersenretz.fr", 152], ["Mairie déléguée - Saint-Mars-la-Jaille", "44180", "https://www.vallonsdelerdre.fr", 403], ["Mairie déléguée - Saint-Sulpice-des-Landes", "44191", "https://www.vallonsdelerdre.fr", 403], ["Mairie - Briollay", "49048", "https://www.briollay.fr", 120], ["Mairie - Écouflant", "49129", "http://www.ecouflant.fr", 108], ["Mairie - Bouchemaine", "49035", "https://www.ville-bouchemaine.fr", 388], ["Mairie déléguée - Villemoisan", "49376", "http://www.val-erdre-auxence.fr", 173], ["Mairie - Mazé-Milon", "49194", "https://www.maze-milon.fr", 364], ["Mairie déléguée - Vergonnes", "49366", "https://www.ombreedanjou.fr", 215], ["Mairie - Ombrée d'Anjou", "49248", "https://www.ombreedanjou.fr", 215], ["Mairie - Loire-Authion", "49307", "https://www.loire-authion.fr", 608], ["Mairie déléguée - Vauchrétien", "49363", "https://www.brissacloireaubance.fr", 337], ["Mairie déléguée - Bauné", "49019", "https://www.loire-authion.fr", 608], ["Mairie déléguée - Noëllet", "49226", "https://www.ombreedanjou.fr", 215], ["Mairie déléguée - Combrée", "49103", "https://www.ombreedanjou.fr", 215], ["Mairie déléguée - Gennes", "49149", "https://www.gennesvaldeloire.fr", 457], ["Mairie déléguée - Corné", "49106", "https://www.loire-authion.fr", 608], ["Mairie déléguée - Andard", "49004", "https://www.loire-authion.fr", 608], ["Mairie déléguée - La Cornuaille", "49108", "https://www.val-erdre-auxence.fr", 173], ["Mairie - Verrières-en-Anjou", "49323", "https://www.verrieresenanjou.fr", 210], ["Mairie déléguée - La Prévière", "49250", "https://www.ombreedanjou.fr", 215], ["Mairie - Brissac Loire Aubance", "49050", "https://www.brissacloireaubance.fr", 337], ["Mairie déléguée - Le Tremblay", "49354", "https://www.ombreedanjou.fr", 215], ["Mairie déléguée - La Bohalle", "49032", "https://www.loire-authion.fr", 608], ["Mairie déléguée - Chazé-Henry", "49088", "https://www.ombreedanjou.fr", 215], ["Mairie déléguée - La Daguenière", "49117", "https://www.loire-authion.fr", 608], ["Mairie déléguée - Grugé-l'Hôpital", "49156", "https://www.ombreedanjou.fr", 215], ["Mairie - Val d'Erdre-Auxence", "49183", "https://www.val-erdre-auxence.fr", 173], ["Mairie - Longuenée-en-Anjou", "49200", "http://www.longuenee-en-anjou.fr", 225], ["Mairie déléguée - Fontaine-Milon", "49139", "https://www.maze-milon.fr", 364], ["Mairie - Gennes-Val-de-Loire", "49261", "https://www.gennesvaldeloire.fr", 457], ["Mairie déléguée - Brain-sur-l'Authion", "49042", "https://www.loire-authion.fr", 608], ["Mairie déléguée - Le Plessis-Macé", "49242", "https://www.longuenee-en-anjou.fr", 225], ["Mairie - Sainte-Gemmes-sur-Loire", "49278", "https://www.sainte-gemmes-sur-loire.fr", 126], ["Mairie déléguée - Saint-Mathurin-sur-Loire", "49307", "https://www.loire-authion.fr", 608], ["Mairie déléguée - Saint-Michel-et-Chanveaux", "49309", "https://www.ombreedanjou.fr", 215], ["Mairie déléguée - Saint-Rémy-la-Varenne", "49317", "https://www.brissacloireaubance.fr", 337], ["Mairie déléguée - Saint-Martin-de-la-Place", "49304", "https://www.gennesvaldeloire.fr", 457], ["Mairie - Arzon", "56005", "http://www.arzon.fr", 21], ["Mairie - Sarzeau", "56240", "https://www.sarzeau.fr", 245], ["Mairie - Quiberon", "56186", "https://www.ville-quiberon.fr", 233], ["Mairie - Peillac", "56154", "https://www.peillac.fr", 183], ["Mairie - Saint-Avé", "56206", "https://www.saint-ave.bzh", 761], ["Mairie - Larmor-Plage", "56107", "https://www.larmor-plage.bzh", 354], ["Mairie - Sainte-Anne-d'Auray", "56263", "http://www.sainte-anne-auray.com", 146], ["Mairie - Mouchamps", "85153", "https://www.mouchamps.com", 20], ["Mairie - Chantonnay", "85051", "http://www.ville-chantonnay.fr", 571], ["Mairie - Vendrennes", "85301", "https://www.vendrennes.com", 24], ["Mairie - Mesnard-la-Barotière", "85144", "https://www.mesnard-la-barotiere.fr", 18], ["Mairie - Aubigny-les-Clouzeaux", "85008", "https://www.aubigny-les-clouzeaux.fr", 232], ["Mairie - Rives-de-l'Yon", "85213", "https://www.rivesdelyon.fr", 211], ["Mairie - Saint-Gilles-Croix-de-Vie", "85222", "https://www.saintgillescroixdevie.fr", 263], ["Mairie déléguée - Chaillé-sous-les-Ormeaux", "85043", "https://www.rivesdelyon.fr", 211]]
+[
+[
+"Mairie - Châteaubriant",
+"44036",
+"https://www.mairie-chateaubriant.fr",
+506,
+"contacts"
+],
+[
+"Mairie - Trignac",
+"44210",
+"https://www.mairie-trignac.fr",
+110,
+"contacts"
+],
+[
+"Mairie - Drefféac",
+"44053",
+"https://www.dreffeac.fr",
+96,
+"contacts"
+],
+[
+"Mairie - Treffieux",
+"44208",
+"https://www.treffieux.fr",
+105,
+"contacts"
+],
+[
+"Mairie - Abbaretz",
+"44001",
+"http://www.abbaretz.fr",
+107,
+"contacts"
+],
+[
+"Mairie - Carquefou",
+"44026",
+"https://www.carquefou.fr",
+456,
+"contacts"
+],
+[
+"Mairie - Puceul",
+"44138",
+"https://www.puceul.fr",
+88,
+"contacts"
+],
+[
+"Mairie - Loireauxence",
+"44213",
+"https://www.loireauxence.fr",
+212,
+"contacts"
+],
+[
+"Mairie - Nozay",
+"44113",
+"https://www.nozay44.fr",
+302,
+"contacts"
+],
+[
+"Mairie - Cordemais",
+"44045",
+"https://www.cordemais.fr",
+231,
+"contacts"
+],
+[
+"Mairie - Pontchâteau",
+"44129",
+"https://www.pontchateau.fr",
+383,
+"contacts"
+],
+[
+"Mairie - Ligné",
+"44082",
+"https://www.ligne.fr",
+368,
+"contacts"
+],
+[
+"Mairie - Vay",
+"44214",
+"http://www.vay.fr",
+161,
+"contacts"
+],
+[
+"Mairie - Saffré",
+"44149",
+"https://www.saffre.fr",
+214,
+"contacts"
+],
+[
+"Mairie - Guémené-Penfao",
+"44067",
+"https://www.mairie-guemene-penfao.fr",
+289,
+"contacts"
+],
+[
+"Mairie déléguée - Maumusson",
+"44093",
+"https://www.vallonsdelerdre.fr",
+403,
+"contacts"
+],
+[
+"Mairie déléguée - Freigné",
+"44225",
+"https://www.vallonsdelerdre.fr",
+403,
+"contacts"
+],
+[
+"Mairie - Basse-Goulaine",
+"44009",
+"http://www.basse-goulaine.fr",
+208,
+"contacts"
+],
+[
+"Mairie déléguée - Bonnoeuvre",
+"44017",
+"https://www.vallonsdelerdre.fr",
+403,
+"contacts"
+],
+[
+"Mairie - La Grigonnais",
+"44224",
+"https://www.lagrigonnais.fr",
+123,
+"contacts"
+],
+[
+"Mairie déléguée - Vritz",
+"44219",
+"https://www.vallonsdelerdre.fr",
+403,
+"contacts"
+],
+[
+"Mairie - Vallons-de-l'Erdre",
+"44180",
+"https://www.vallonsdelerdre.fr",
+403,
+"contacts"
+],
+[
+"Mairie - Sainte-Luce-sur-Loire",
+"44172",
+"https://www.sainte-luce-loire.com",
+325,
+"contacts"
+],
+[
+"Mairie - Saint-Brevin-les-Pins",
+"44154",
+"https://www.saint-brevin.fr",
+252,
+"contacts"
+],
+[
+"Mairie - Saint-Gildas-des-Bois",
+"44161",
+"http://www.saintgildasdesbois.fr",
+172,
+"contacts"
+],
+[
+"Mairie - Les Moutiers-en-Retz",
+"44106",
+"https://www.mairie-lesmoutiersenretz.fr",
+152,
+"contacts"
+],
+[
+"Mairie déléguée - Saint-Mars-la-Jaille",
+"44180",
+"https://www.vallonsdelerdre.fr",
+403,
+"contacts"
+],
+[
+"Mairie déléguée - Saint-Sulpice-des-Landes",
+"44191",
+"https://www.vallonsdelerdre.fr",
+403,
+"contacts"
+],
+[
+"Mairie - Briollay",
+"49048",
+"https://www.briollay.fr",
+120,
+"contacts"
+],
+[
+"Mairie - Écouflant",
+"49129",
+"http://www.ecouflant.fr",
+108,
+"contacts"
+],
+[
+"Mairie - Bouchemaine",
+"49035",
+"https://www.ville-bouchemaine.fr",
+388,
+"contacts"
+],
+[
+"Mairie déléguée - Villemoisan",
+"49376",
+"http://www.val-erdre-auxence.fr",
+173,
+"contacts"
+],
+[
+"Mairie - Mazé-Milon",
+"49194",
+"https://www.maze-milon.fr",
+364,
+"contacts"
+],
+[
+"Mairie déléguée - Vergonnes",
+"49366",
+"https://www.ombreedanjou.fr",
+215,
+"contacts"
+],
+[
+"Mairie - Ombrée d'Anjou",
+"49248",
+"https://www.ombreedanjou.fr",
+215,
+"contacts"
+],
+[
+"Mairie - Loire-Authion",
+"49307",
+"https://www.loire-authion.fr",
+608,
+"contacts"
+],
+[
+"Mairie déléguée - Vauchrétien",
+"49363",
+"https://www.brissacloireaubance.fr",
+337,
+"contacts"
+],
+[
+"Mairie déléguée - Bauné",
+"49019",
+"https://www.loire-authion.fr",
+608,
+"contacts"
+],
+[
+"Mairie déléguée - Noëllet",
+"49226",
+"https://www.ombreedanjou.fr",
+215,
+"contacts"
+],
+[
+"Mairie déléguée - Combrée",
+"49103",
+"https://www.ombreedanjou.fr",
+215,
+"contacts"
+],
+[
+"Mairie déléguée - Gennes",
+"49149",
+"https://www.gennesvaldeloire.fr",
+457,
+"contacts"
+],
+[
+"Mairie déléguée - Corné",
+"49106",
+"https://www.loire-authion.fr",
+608,
+"contacts"
+],
+[
+"Mairie déléguée - Andard",
+"49004",
+"https://www.loire-authion.fr",
+608,
+"contacts"
+],
+[
+"Mairie déléguée - La Cornuaille",
+"49108",
+"https://www.val-erdre-auxence.fr",
+173,
+"contacts"
+],
+[
+"Mairie - Verrières-en-Anjou",
+"49323",
+"https://www.verrieresenanjou.fr",
+210,
+"contacts"
+],
+[
+"Mairie déléguée - La Prévière",
+"49250",
+"https://www.ombreedanjou.fr",
+215,
+"contacts"
+],
+[
+"Mairie - Brissac Loire Aubance",
+"49050",
+"https://www.brissacloireaubance.fr",
+337,
+"contacts"
+],
+[
+"Mairie déléguée - Le Tremblay",
+"49354",
+"https://www.ombreedanjou.fr",
+215,
+"contacts"
+],
+[
+"Mairie déléguée - La Bohalle",
+"49032",
+"https://www.loire-authion.fr",
+608,
+"contacts"
+],
+[
+"Mairie déléguée - Chazé-Henry",
+"49088",
+"https://www.ombreedanjou.fr",
+215,
+"contacts"
+],
+[
+"Mairie déléguée - La Daguenière",
+"49117",
+"https://www.loire-authion.fr",
+608,
+"contacts"
+],
+[
+"Mairie déléguée - Grugé-l'Hôpital",
+"49156",
+"https://www.ombreedanjou.fr",
+215,
+"contacts"
+],
+[
+"Mairie - Val d'Erdre-Auxence",
+"49183",
+"https://www.val-erdre-auxence.fr",
+173,
+"contacts"
+],
+[
+"Mairie - Longuenée-en-Anjou",
+"49200",
+"http://www.longuenee-en-anjou.fr",
+225,
+"contacts"
+],
+[
+"Mairie déléguée - Fontaine-Milon",
+"49139",
+"https://www.maze-milon.fr",
+364,
+"contacts"
+],
+[
+"Mairie - Gennes-Val-de-Loire",
+"49261",
+"https://www.gennesvaldeloire.fr",
+457,
+"contacts"
+],
+[
+"Mairie déléguée - Brain-sur-l'Authion",
+"49042",
+"https://www.loire-authion.fr",
+608,
+"contacts"
+],
+[
+"Mairie déléguée - Le Plessis-Macé",
+"49242",
+"https://www.longuenee-en-anjou.fr",
+225,
+"contacts"
+],
+[
+"Mairie - Sainte-Gemmes-sur-Loire",
+"49278",
+"https://www.sainte-gemmes-sur-loire.fr",
+126,
+"contacts"
+],
+[
+"Mairie déléguée - Saint-Mathurin-sur-Loire",
+"49307",
+"https://www.loire-authion.fr",
+608,
+"contacts"
+],
+[
+"Mairie déléguée - Saint-Michel-et-Chanveaux",
+"49309",
+"https://www.ombreedanjou.fr",
+215,
+"contacts"
+],
+[
+"Mairie déléguée - Saint-Rémy-la-Varenne",
+"49317",
+"https://www.brissacloireaubance.fr",
+337,
+"contacts"
+],
+[
+"Mairie déléguée - Saint-Martin-de-la-Place",
+"49304",
+"https://www.gennesvaldeloire.fr",
+457,
+"contacts"
+],
+[
+"Mairie - Arzon",
+"56005",
+"http://www.arzon.fr",
+21,
+"contacts"
+],
+[
+"Mairie - Sarzeau",
+"56240",
+"https://www.sarzeau.fr",
+245,
+"contacts"
+],
+[
+"Mairie - Quiberon",
+"56186",
+"https://www.ville-quiberon.fr",
+233,
+"contacts"
+],
+[
+"Mairie - Peillac",
+"56154",
+"https://www.peillac.fr",
+183,
+"contacts"
+],
+[
+"Mairie - Saint-Avé",
+"56206",
+"https://www.saint-ave.bzh",
+761,
+"contacts"
+],
+[
+"Mairie - Larmor-Plage",
+"56107",
+"https://www.larmor-plage.bzh",
+354,
+"contacts"
+],
+[
+"Mairie - Sainte-Anne-d'Auray",
+"56263",
+"http://www.sainte-anne-auray.com",
+146,
+"contacts"
+],
+[
+"Mairie - Mouchamps",
+"85153",
+"https://www.mouchamps.com",
+20,
+"contacts"
+],
+[
+"Mairie - Chantonnay",
+"85051",
+"http://www.ville-chantonnay.fr",
+571,
+"contacts"
+],
+[
+"Mairie - Vendrennes",
+"85301",
+"https://www.vendrennes.com",
+24,
+"contacts"
+],
+[
+"Mairie - Mesnard-la-Barotière",
+"85144",
+"https://www.mesnard-la-barotiere.fr",
+18,
+"contacts"
+],
+[
+"Mairie - Aubigny-les-Clouzeaux",
+"85008",
+"https://www.aubigny-les-clouzeaux.fr",
+232,
+"contacts"
+],
+[
+"Mairie - Rives-de-l'Yon",
+"85213",
+"https://www.rivesdelyon.fr",
+211,
+"contacts"
+],
+[
+"Mairie - Saint-Gilles-Croix-de-Vie",
+"85222",
+"https://www.saintgillescroixdevie.fr",
+263,
+"contacts"
+],
+[
+"Mairie déléguée - Chaillé-sous-les-Ormeaux",
+"85043",
+"https://www.rivesdelyon.fr",
+211,
+"contacts"
+],
+[
+"Mairie - Pornic",
+"44131",
+"https://www.pornic.fr",
+298,
+"fiche-annuaire"
+],
+[
+"Mairie - Assérac",
+"44006",
+"https://www.asserac.fr",
+5,
+"partenaire"
+],
+[
+"Mairie - Rezé",
+"44143",
+"https://www.reze.fr",
+539,
+"fiche-annuaire"
+],
+[
+"Mairie - Pornichet",
+"44132",
+"https://www.ville-pornichet.fr",
+173,
+"annuaire"
+],
+[
+"Mairie - Orvault",
+"44114",
+"https://www.orvault.fr",
+657,
+"directory"
+],
+[
+"Mairie - Couëron",
+"44047",
+"https://www.ville-coueron.fr",
+309,
+"entreprise"
+],
+[
+"Mairie - Boussay",
+"44022",
+"https://www.boussay.fr",
+224,
+"directory"
+],
+[
+"Mairie - Legé",
+"44081",
+"https://www.ville-lege44.fr",
+87,
+"fiche-annuaire"
+],
+[
+"Mairie - Erbray",
+"44054",
+"https://www.erbray.fr",
+80,
+"annuaire"
+],
+[
+"Mairie - Donges",
+"44052",
+"https://ville-donges.fr",
+223,
+"annuaire-economique"
+],
+[
+"Mairie - La Turballe",
+"44211",
+"https://www.laturballe.fr",
+3,
+"partenaire"
+],
+[
+"Mairie - La Chevallerais",
+"44221",
+"https://www.lachevallerais.fr",
+49,
+"entreprise"
+],
+[
+"Mairie - Saint-Joachim",
+"44168",
+"https://www.saint-joachim.fr",
+188,
+"annuaire"
+],
+[
+"Mairie - Saint-Nazaire",
+"44184",
+"https://www.saintnazaire.fr",
+80,
+"directory"
+],
+[
+"Mairie - Pont-Saint-Martin",
+"44130",
+"http://www.mairie-pontsaintmartin.fr",
+337,
+"annuaire"
+],
+[
+"Mairie - Machecoul-Saint-Même",
+"44087",
+"https://www.machecoul-saint-meme.fr",
+221,
+"directory"
+],
+[
+"Mairie - Allonnes",
+"49002",
+"https://www.allonnes-49.fr",
+131,
+"entreprises"
+],
+[
+"Mairie - Vaudelnay",
+"49364",
+"https://vaudelnay.fr",
+27,
+"professionnel"
+],
+[
+"Mairie - Sèvremoine",
+"49301",
+"https://www.sevremoine.fr",
+495,
+"fiche-annuaire"
+],
+[
+"Mairie - Montsoreau",
+"49219",
+"https://ville-montsoreau.fr",
+76,
+"commerces"
+],
+[
+"Mairie - Fontevraud-l'Abbaye",
+"49140",
+"https://www.fontevraud-abbaye.fr",
+1,
+"entreprises"
+],
+[
+"Mairie - Longué-Jumelles",
+"49180",
+"https://www.villedelonguejumelles.fr",
+104,
+"commerces"
+],
+[
+"Mairie déléguée - Brigné",
+"49047",
+"https://www.doue-en-anjou.fr",
+269,
+"fiche-annuaire"
+],
+[
+"Mairie - Jarzé-Villages",
+"49163",
+"https://www.jarzevillages.fr",
+28,
+"entreprise"
+],
+[
+"Mairie - Montreuil-Juigné",
+"49214",
+"https://www.ville-montreuil-juigne.fr",
+288,
+"directory"
+],
+[
+"Mairie - Lys-Haut-Layon",
+"49373",
+"http://www.lyshautlayon.fr",
+288,
+"entreprises"
+],
+[
+"Mairie - Montrevault-sur-Èvre",
+"49218",
+"https://www.montrevaultsurevre.fr",
+713,
+"annuaire"
+],
+[
+"Mairie - Les Bois d'Anjou",
+"49138",
+"https://www.boisdanjou.fr",
+99,
+"annuaire"
+],
+[
+"Mairie - Saint-Paul-du-Bois",
+"49310",
+"https://saintpauldubois.com",
+18,
+"entreprise"
+],
+[
+"Mairie - Arradon",
+"56003",
+"https://www.arradon.com",
+64,
+"directory"
+],
+[
+"Mairie - Molac",
+"56135",
+"https://www.molac.bzh",
+86,
+"annuaire"
+],
+[
+"Mairie - Sérent",
+"56244",
+"https://www.serent.bzh",
+264,
+"annuaire"
+],
+[
+"Mairie - Quistinic",
+"56188",
+"https://www.quistinic.fr",
+68,
+"annuaire-pro"
+],
+[
+"Mairie - Quistinic",
+"56188",
+"https://www.quistinic.fr",
+11,
+"annuaire_marchand"
+],
+[
+"Mairie - Erdeven",
+"56054",
+"http://www.erdeven.fr",
+20,
+"directory"
+],
+[
+"Mairie - Erdeven",
+"56054",
+"http://www.erdeven.fr",
+123,
+"directory_companies"
+],
+[
+"Mairie - Bréhan",
+"56024",
+"http://www.brehan.fr",
+53,
+"annuaire"
+],
+[
+"Mairie - Questembert",
+"56184",
+"https://www.questembert.bzh",
+253,
+"directory"
+],
+[
+"Mairie - Plouhinec",
+"56169",
+"https://www.plouhinec.com",
+191,
+"directory"
+],
+[
+"Mairie - Landaul",
+"56096",
+"https://www.landaul.fr",
+84,
+"entreprise"
+],
+[
+"Mairie - Hennebont",
+"56083",
+"https://www.hennebont.bzh",
+174,
+"fiche-annuaire"
+],
+[
+"Mairie - Surzur",
+"56248",
+"https://www.surzur.fr",
+206,
+"contact"
+],
+[
+"Mairie déléguée - Glénac",
+"56064",
+"https://www.la-gacilly.fr",
+39,
+"artisans-et-commerce"
+],
+[
+"Mairie - Moustoir-Ac",
+"56141",
+"https://moustoir-ac.fr",
+67,
+"contact"
+],
+[
+"Mairie - Saint-Gravé",
+"56218",
+"https://www.saint-grave.fr",
+33,
+"annuaire"
+],
+[
+"Mairie - Theix-Noyalo",
+"56251",
+"https://www.theix-noyalo.fr",
+119,
+"directory"
+],
+[
+"Mairie - Saint-Armel",
+"56205",
+"https://www.saint-armel56.fr",
+35,
+"directory"
+],
+[
+"Mairie - Challans",
+"85047",
+"https://www.challans.fr",
+339,
+"fiche-annuaire"
+],
+[
+"Mairie - L'Herbergement",
+"85108",
+"https://www.lherbergement.fr",
+68,
+"directory"
+],
+[
+"Mairie - Châteauneuf",
+"85062",
+"https://www.chateauneuf85.fr",
+20,
+"fiche-annuaire"
+],
+[
+"Mairie - Froidfond",
+"85095",
+"https://www.froidfond.fr",
+116,
+"fiche-annuaire"
+],
+[
+"Mairie - Coëx",
+"85070",
+"https://ville-coex.fr",
+61,
+"rpa_annuaire"
+],
+[
+"Mairie - Rocheservière",
+"85190",
+"https://www.rocheserviere.fr",
+91,
+"directory"
+],
+[
+"Mairie - Montréverd",
+"85197",
+"http://www.montreverd.fr",
+82,
+"directory"
+],
+[
+"Mairie - Avrillé",
+"85010",
+"https://avrille85.fr",
+53,
+"professionnel"
+],
+[
+"Mairie - Angles",
+"85004",
+"https://www.angles.fr",
+222,
+"annuaire"
+],
+[
+"Mairie - Bouin",
+"85029",
+"https://www.bouin.fr",
+45,
+"fiche-annuaire"
+],
+[
+"Mairie déléguée - Boufféré",
+"85027",
+"https://www.montaigu-vendee.com",
+436,
+"directory"
+],
+[
+"Mairie - Treize-Septiers",
+"85295",
+"https://www.treize-septiers.fr",
+75,
+"directory"
+],
+[
+"Mairie - La Bruffière",
+"85039",
+"https://www.labruffiere.fr",
+85,
+"directory"
+],
+[
+"Mairie - L'Île-d'Yeu",
+"85113",
+"http://mairie.ile-yeu.fr",
+150,
+"directory"
+],
+[
+"Mairie - Les Landes-Genusson",
+"85119",
+"https://www.leslandesgenusson.fr",
+171,
+"annuaire"
+],
+[
+"Mairie - Bois-de-Céné",
+"85024",
+"https://www.boisdecene.fr",
+143,
+"fiche-annuaire"
+],
+[
+"Mairie déléguée - La Bernardière",
+"85076",
+"https://www.cugandlabernardiere.fr",
+86,
+"directory"
+],
+[
+"Mairie - Saint-Christophe-du-Ligneron",
+"85204",
+"http://www.saint-christophe-du-ligneron.fr",
+127,
+"fiche-annuaire"
+],
+[
+"Mairie - La Boissière-de-Montaigu",
+"85025",
+"https://www.boissieredemontaigu.fr",
+34,
+"directory"
+],
+[
+"Mairie - Saint-Philbert-de-Bouaine",
+"85262",
+"https://www.saintphilbertdebouaine.fr",
+83,
+"directory"
+],
+[
+"Mairie - Saint-Laurent-sur-Sèvre",
+"85238",
+"http://www.saintlaurentsursevre.fr",
+47,
+"annuaire_commune"
+],
+[
+"Mairie - Saint-Laurent-sur-Sèvre",
+"85238",
+"http://www.saintlaurentsursevre.fr",
+203,
+"annuaire"
+],
+[
+"Mairie - Nozay",
+"",
+"https://www.cc-nozay.fr",
+755,
+"contacts"
+],
+[
+"Mairie - Segré-en-Anjou Bleu",
+"",
+"https://www.anjoubleucommunaute.fr",
+29,
+"contacts"
+],
+[
+"Mairie - Benet",
+"",
+"https://www.cc-vsa.com",
+25,
+"contacts"
+],
+[
+"Mairie - Montaigu-Vendée",
+"",
+"https://www.terresdemontaigu.fr",
+994,
+"directory"
+],
+[
+"Mairie - Saint-Jean-de-Monts",
+"",
+"https://www.oceanmaraisdemonts.fr",
+27,
+"directory"
+],
+[
+"Mairie - Châteaubriant",
+"",
+"https://www.cc-chateaubriant-derval.fr",
+84,
+"directory"
+],
+[
+"Mairie - Saint-Nazaire",
+"",
+"https://www.saintnazaireagglo.fr",
+151,
+"directory"
+],
+[
+"Mairie - Chalonnes-sur-Loire",
+"",
+"https://loire-layon-aubance.fr",
+61,
+"directory_local"
+]
+]
