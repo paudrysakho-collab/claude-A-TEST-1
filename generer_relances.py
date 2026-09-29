@@ -88,9 +88,9 @@ def norm(e):
 
 def trouver(motif):
     for dossier in (SOURCES, ICI):
-        f = sorted(glob.glob(os.path.join(dossier, motif)))
+        f = glob.glob(os.path.join(dossier, motif))
         if f:
-            return f[-1]
+            return max(f, key=os.path.getmtime)  # la version la plus récente
     return None
 
 
