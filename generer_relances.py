@@ -22,7 +22,9 @@ import glob
 import os
 import re
 import sys
+import unicodedata
 from collections import Counter
+from difflib import SequenceMatcher
 
 import openpyxl
 
@@ -62,13 +64,22 @@ REGLES_NOM = [
      r"bistr|gastronom|\bh[oô]tel|auberge|relais|logis|\btable\b"),
 ]
 RE_RAPIDE = re.compile(r"\bpmu\b|tabac|pizz|cr[eê]p|galette|kebab|burger|tacos|sushi|snack|friterie|"
-                       r"fast.?food|restauration rapide|sandwich|bagel|wok|roi du poulet", re.I)
+                       r"fast.?food|restauration rapide|sandwich|bagel|wok|roi du poulet|diner\b|tommy", re.I)
 # Règles de rejet d'origine (brief initial) : écoles, campings, gîtes, chambres d'hôtes…
 RE_HORS_CIBLE = re.compile(r"lyc[ée]e|[ée]cole|coll[èe]ge|\bcfa\b|greta|campus|camping|g[iî]tes?\b|"
                            r"chambres? d.h[oô]tes?|maison d.h[oô]tes|ehpad|scolaire", re.I)
-SOUS_CHAINES_INTERDITES = ("le21pornic", "domainedeliziec", "camping", "gite", "greta", "cfa", "chambre-hote",
+SOUS_CHAINES_INTERDITES = ("le21pornic", "21pornic", "domainedeliziec", "liziec", "camping", "gite", "greta", "cfa", "chambre-hote",
                            "ac-nantes.fr", "ac-rennes.fr")
 RE_EMAIL = re.compile(r"[a-z0-9._%+'-]+@[a-z0-9.-]+\.[a-z]{2,}")
+WEBMAILS = {"gmail.com", "orange.fr", "wanadoo.fr", "free.fr", "sfr.fr", "laposte.net", "hotmail.com",
+            "hotmail.fr", "outlook.fr", "outlook.com", "yahoo.fr", "yahoo.com", "icloud.com", "bbox.fr",
+            "live.fr", "aol.com", "neuf.fr", "club-internet.fr", "numericable.fr", "gmx.fr", "msn.com"}
+# Inscrits signalés par l'utilisateur le 30/09 (adresses alternatives d'établissements déjà inscrits).
+INSCRITS_SIGNALES = {"bulleblancrouge@gmail.com", "ralph.pillet@wanadoo.fr", "ecrivez-nous@larayonnantes.fr",
+                     "ginoalteregos@gmail.com", "dv-cave@dvfrance.com", "c.ribet@dvfrance.com",
+                     "comptabilitefournisseur@dvfrance.com", "n.vergnault@dvfrance.com"}
+MOTS_VIDES = {"le", "la", "les", "l", "de", "du", "des", "d", "et", "sarl", "sas", "scea", "eurl", "sa",
+              "societe", "ste", "entreprise", "restaurant", "a", "au", "aux", "the", "sarl", "dv"}
 
 
 def norm(e):
@@ -88,17 +99,72 @@ def emails_csv(chemin):
         return {norm(r.get("Email")) for r in csv.DictReader(f)} - {""}
 
 
-def emails_inscriptions(chemin):
+def cle_nom(nom):
+    """Nom d'établissement réduit à ses mots utiles, sans accents ni ponctuation."""
+    n = unicodedata.normalize("NFD", (nom or "").lower())
+    n = "".join(c for c in n if not unicodedata.combining(c))
+    n = re.sub(r"^a toute l'equipe\b", " ", n.replace("’", "'"))
+    mots = [m for m in re.split(r"[^a-z0-9]+", n) if m and m not in MOTS_VIDES]
+    return " ".join(mots)
+
+
+def domaine_pro(e):
+    d = e.rsplit("@", 1)[-1] if "@" in e else ""
+    return d if d and d not in WEBMAILS else ""
+
+
+def lire_inscriptions(chemin):
+    """E-mails, domaines pros, parties avant @ et noms d'établissements des inscrits."""
     wb = openpyxl.load_workbook(chemin, read_only=True)
-    sortie = set()
+    ins = {"emails": set(), "domaines": set(), "locaux": set(), "noms": set()}
     for ws in wb.worksheets:
         lignes = list(ws.iter_rows(values_only=True))
         if not lignes:
             continue
-        for j, titre in enumerate(lignes[0]):
-            if titre and "mail" in str(titre).lower():
-                sortie |= {norm(str(l[j])) for l in lignes[1:] if l[j]}
-    return sortie
+        titres = [str(t or "").lower() for t in lignes[0]]
+        for l in lignes[1:]:
+            for j, t in enumerate(titres):
+                v = str(l[j] or "").strip() if j < len(l) else ""
+                if not v:
+                    continue
+                if "mail" in t:
+                    e = norm(v.replace(" gmail.com", "@gmail.com"))
+                    ins["emails"].add(e)
+                    ins["locaux"].add(e.split("@")[0])
+                    if domaine_pro(e):
+                        ins["domaines"].add(domaine_pro(e))
+                elif "site" in t:
+                    h = re.sub(r"^(https?://)?(www\.)?", "", v.lower()).split("/")[0]
+                    if "." in h and not re.search(r"facebook|instagram|google|linkedin", h):
+                        ins["domaines"].add(h)
+                elif t.startswith("nom de la soci"):
+                    if cle_nom(v):
+                        ins["noms"].add(cle_nom(v))
+    ins["locaux"] -= {"contact", "info", "bonjour", "hello", "accueil", "reservation", "direction",
+                       "restaurant", "cave", "commande", "vin", "boutique", "infos"}
+    return ins
+
+
+def meme_inscrit(email, prenom, etablissement, ins):
+    """Raison si le contact correspond à un établissement inscrit, sinon None."""
+    if email in ins["emails"] or email in INSCRITS_SIGNALES:
+        return "e-mail inscrit"
+    if domaine_pro(email) in ins["domaines"]:
+        return "même domaine qu'un inscrit"
+    if email.split("@")[0] in ins["locaux"]:
+        return "même adresse qu'un inscrit, autre fournisseur"
+    for nom in (etablissement, prenom if prenom.lower().startswith("à toute l'équipe") else ""):
+        cle = cle_nom(nom)
+        if not cle:
+            continue
+        mots = set(cle.split())
+        for n in ins["noms"]:
+            mots_n = set(n.split())
+            if cle == n or SequenceMatcher(None, cle, n).ratio() >= 0.9 \
+                    or (len(mots_n) >= 2 and mots_n <= mots) or (len(mots) >= 2 and mots <= mots_n) \
+                    or (len(mots_n) >= 2 and len(mots_n & mots) >= 2):
+                return f"même établissement qu'un inscrit ({n})"
+    return None
 
 
 def profil(categorie, prenom, campagnes, email):
@@ -133,7 +199,8 @@ def main():
         if not chemin or not os.path.exists(chemin):
             sys.exit(f"Fichier introuvable : {nom}")
     deja_envoyes = emails_csv(lundi) | emails_csv(mardi)
-    inscrits = emails_inscriptions(inscriptions)
+    inscrits = lire_inscriptions(inscriptions)
+    doublons_inscrits = []
 
     ws = openpyxl.load_workbook(master, read_only=True)["Tous les contacts"]
     lignes = list(ws.iter_rows(values_only=True))
@@ -150,8 +217,11 @@ def main():
             rejets["doublon"] += 1
         elif "DÉSABONNÉ" in statut.upper():
             rejets["désabonné"] += 1
-        elif "INSCRIT" in statut.upper() or l[ix["Inscrit"]] or email in inscrits:
+        elif "INSCRIT" in statut.upper() or l[ix["Inscrit"]]:
             rejets["inscrit au salon"] += 1
+        elif meme_inscrit(email, prenom, l[ix["Établissement"]], inscrits):
+            rejets["inscrit au salon (autre adresse ou même établissement)"] += 1
+            doublons_inscrits.append((email, prenom, meme_inscrit(email, prenom, l[ix["Établissement"]], inscrits)))
         elif email in deja_envoyes:
             rejets["déjà envoyé lundi ou mardi"] += 1
         elif n < 1:
@@ -187,6 +257,9 @@ def main():
                                                for e, n in sorted(Counter(c['envois'] for c in lot).items())))
         for p, n in Counter(c["profil"] for c in lot).most_common():
             print(f"    {n:4d}  {p}")
+    print("\nInscrits retrouvés sous une autre adresse ou un nom identique :")
+    for e, p, r in doublons_inscrits:
+        print(f"  {e:45s} {p[:45]:45s} {r}")
     with open(os.path.join(ICI, "RELANCE_DETAILS.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f, lineterminator="\n")
         w.writerow(["Lot", "Email", "Prenom", "Priorite", "Profil", "Nb_envois_precedents"])
